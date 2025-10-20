@@ -1,0 +1,46 @@
+# Current Epic Tracking
+# Used by SM to track which epic and stories are being worked on
+
+current_epic:
+  number: 0
+  name: "Project Scaffolding & Development Environment Setup"
+  file: docs/epics/epic-0-project-scaffolding.md
+  status: in_progress
+
+  stories:
+    - id: STORY-0.1
+      title: "Initialize Xcode Project"
+      status: pending
+      file: null  # Will be created by SM
+
+    - id: STORY-0.2
+      title: "Install Swift Package Manager Dependencies"
+      status: pending
+      file: null
+
+    - id: STORY-0.3
+      title: "Set Up Firebase Backend"
+      status: pending
+      file: null
+
+    - id: STORY-0.4
+      title: "Configure SwiftData ModelContainer"
+      status: pending
+      file: null
+
+    - id: STORY-0.5
+      title: "Create Project File Structure"
+      status: pending
+      file: null
+
+    - id: STORY-0.6
+      title: "Set Up Firebase Emulators (Optional)"
+      status: pending
+      file: null
+
+    - id: STORY-0.7
+      title: "Initialize Git Repository"
+      status: pending
+      file: null
+
+next_story_to_create: STORY-0.1

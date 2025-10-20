@@ -1,0 +1,163 @@
+---
+# Story Template for MessageAI Project
+# This template is used by the SM agent to create detailed user stories
+
+id: STORY-{epic}.{number}
+title: "{Short descriptive title}"
+epic: "Epic {number}: {Epic name}"
+status: draft
+priority: P{0-3}  # P0=Critical, P1=High, P2=Medium, P3=Low
+estimate: {points}  # Story points (1,2,3,5,8)
+assigned_to: null
+created_date: "{YYYY-MM-DD}"
+sprint_day: null  # Which day of the 7-day sprint
+
+---
+
+## Description
+
+**As a** {user type/role}
+**I need** {capability/feature}
+**So that** {business value/benefit}
+
+{Additional context about what this story accomplishes and why it matters}
+
+---
+
+## Acceptance Criteria
+
+**This story is complete when:**
+
+- [ ] {Specific, testable criteria 1}
+- [ ] {Specific, testable criteria 2}
+- [ ] {Specific, testable criteria 3}
+- [ ] {Additional criteria as needed}
+
+---
+
+## Technical Tasks
+
+**Implementation steps:**
+
+1. **{Task category 1}**
+   - {Specific action item}
+   - {Specific action item}
+   - {Code/config details if applicable}
+
+2. **{Task category 2}**
+   - {Specific action item}
+   - {Specific action item}
+
+3. **{Additional tasks as needed}**
+
+---
+
+## Technical Specifications
+
+### Files to Create/Modify
+
+```
+{List of files that will be created or modified}
+- Path/To/File1.swift (create)
+- Path/To/File2.swift (modify)
+```
+
+### Code Examples
+
+{If applicable, include code snippets from architecture docs}
+
+```swift
+// Example implementation pattern
+{Code example}
+```
+
+### Dependencies
+
+**Required:**
+- {Dependency 1 - e.g., "Story 0.1 must be complete"}
+- {Dependency 2 - e.g., "Firebase SDK installed"}
+
+**Blocks:**
+- {What this story blocks - e.g., "Story 1.2"}
+
+**External:**
+- {External dependencies - e.g., "Firebase project created"}
+
+---
+
+## Testing & Validation
+
+### Test Procedure
+
+1. {Step-by-step testing instructions}
+2. {What to verify}
+3. {Expected outcomes}
+
+### Success Criteria
+
+- [ ] {Builds without errors}
+- [ ] {Runs on simulator/device}
+- [ ] {Specific feature works as expected}
+- [ ] {Performance meets requirements}
+
+---
+
+## References
+
+**Architecture Docs:**
+- {Link to relevant architecture doc sections}
+
+**PRD Sections:**
+- {Link to relevant PRD sections}
+
+**Implementation Guides:**
+- {Link to guides like SwiftData, Supermemory, etc.}
+
+**Related Stories:**
+- {Links to related stories}
+
+---
+
+## Notes & Considerations
+
+### Implementation Notes
+
+{Any important notes for the developer}
+
+### Edge Cases
+
+- {Edge case 1}
+- {Edge case 2}
+
+### Performance Considerations
+
+{Any performance-related notes}
+
+### Security Considerations
+
+{Any security-related notes}
+
+---
+
+## Metadata
+
+**Created by:** {Agent/Person}
+**Created date:** {YYYY-MM-DD}
+**Last updated:** {YYYY-MM-DD}
+**Sprint:** {Day X of 7-day sprint}
+**Epic:** {Epic number and name}
+**Story points:** {Number}
+**Priority:** {P0-P3}
+
+---
+
+## Story Lifecycle
+
+- [ ] **Draft** - Story created, needs review
+- [ ] **Ready** - Story reviewed and ready for development
+- [ ] **In Progress** - Developer working on story
+- [ ] **Blocked** - Story blocked by dependency or issue
+- [ ] **Review** - Implementation complete, needs QA review
+- [ ] **Done** - Story complete and validated
+
+**Current Status:** Draft
