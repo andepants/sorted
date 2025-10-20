@@ -1,0 +1,183 @@
+# BMAD Core Configuration - MessageAI Project
+# This file defines project-wide settings for all BMAD agents
+
+project:
+  name: MessageAI
+  type: iOS Native Messaging App
+  description: AI-first iOS messaging application with real-time chat and intelligent conversation management
+
+  # Sprint configuration
+  timeline:
+    total_days: 7
+    mvp_day: 1
+    early_release_day: 4
+    final_release_day: 7
+
+  # Technology constraints
+  tech_stack:
+    platform: iOS 17+
+    language: Swift 6
+    ui_framework: SwiftUI
+    backend: Firebase
+    local_storage: SwiftData
+    concurrency: Swift Concurrency (async/await)
+    package_manager: SPM
+
+  # Project structure
+  directories:
+    docs: docs/
+    architecture: docs/architecture/
+    epics: docs/epics/
+    stories: docs/stories/
+    source: MessageAI/
+    bmad_core: .bmad-core/
+    bmad_agents: .claude/BMad/
+
+  # Key documentation references
+  references:
+    prd: docs/prd.md
+    architecture: docs/architecture.md
+    architecture_index: docs/architecture/index.md
+    tech_stack: docs/architecture/technology-stack.md
+    swiftdata_guide: docs/swiftdata-implementation-guide.md
+    supermemory_guide: docs/supermemory-integration-guide.md
+    ux_design: docs/ux-design.md
+
+# Story management configuration
+story_workflow:
+  story_id_format: "STORY-{epic}.{number}"  # e.g., STORY-0.1, STORY-1.3
+  story_file_format: "story-{epic}.{number}-{slug}.md"  # e.g., story-0.1-xcode-project.md
+  story_location: docs/stories/
+
+  # Story states
+  states:
+    - draft
+    - ready
+    - in_progress
+    - blocked
+    - review
+    - done
+
+  # Required story sections
+  required_sections:
+    - id
+    - title
+    - epic
+    - priority
+    - estimate
+    - description
+    - acceptance_criteria
+    - technical_tasks
+    - dependencies
+    - references
+
+# Agent behavior configuration
+agent_config:
+  # SM (Scrum Master) specific settings
+  sm:
+    auto_validate_stories: true
+    require_acceptance_criteria: true
+    require_technical_tasks: true
+    max_story_points: 8
+
+  # DEV (Developer) specific settings
+  dev:
+    max_file_lines: 500
+    require_documentation: true
+    require_tests: false  # Will enable after MVP
+    swift_style: Apple API Design Guidelines
+
+  # QA specific settings
+  qa:
+    require_test_plan: true
+    require_validation_steps: true
+
+# Code style enforcement
+code_standards:
+  swift:
+    naming_convention: Apple Swift API Design Guidelines
+    max_file_lines: 500
+    documentation_style: "/// Swift doc comments"
+    concurrency_mode: strict
+    prefer_structs: true
+    protocol_oriented: true
+
+  swiftui:
+    state_management:
+      - "@State for view-local state"
+      - "@StateObject for view-owned objects"
+      - "@ObservedObject for passed objects"
+      - "@EnvironmentObject for app-wide state"
+
+    file_organization:
+      - "Extract complex views into separate files"
+      - "Use MARK comments for organization"
+      - "Keep view files under 300 lines"
+
+# Firebase configuration references
+firebase:
+  services:
+    - Authentication
+    - Firestore
+    - Cloud Functions
+    - Cloud Storage
+    - Cloud Messaging
+    - Analytics
+    - Crashlytics
+
+  environments:
+    development:
+      bundle_id: com.messageai.app.dev
+      use_emulators: true
+    staging:
+      bundle_id: com.messageai.app.staging
+      use_emulators: false
+    production:
+      bundle_id: com.messageai.app
+      use_emulators: false
+
+# BMAD workflow rules
+workflow_rules:
+  story_creation:
+    - "All stories must reference PRD and architecture docs"
+    - "Stories must be atomic and independently testable"
+    - "Technical tasks must be specific and actionable"
+    - "Acceptance criteria must be measurable"
+
+  development:
+    - "Check existing files before creating new ones"
+    - "Follow AI-first principles: modular, documented, scalable"
+    - "Keep functions focused and single-purpose"
+    - "Use native Swift solutions first"
+
+  quality_assurance:
+    - "Test on physical devices for Firebase features"
+    - "Validate against acceptance criteria"
+    - "Check for Swift 6 concurrency compliance"
+    - "Verify offline functionality"
+
+# AI-first codebase principles
+ai_first_principles:
+  modularity: "Files must be self-contained and focused"
+  documentation: "All public APIs documented with ///"
+  readability: "Code optimized for AI comprehension"
+  scalability: "Easy to extend without major refactoring"
+  searchability: "Descriptive names, clear structure"
+
+  file_constraints:
+    max_lines: 500
+    max_function_lines: 50
+    max_complexity: "Keep cyclomatic complexity low"
+
+  naming_standards:
+    files: "Descriptive names matching content (e.g., ChatViewModel.swift)"
+    functions: "Verb phrases (e.g., sendMessage, fetchConversations)"
+    properties: "Descriptive nouns (e.g., isLoading, hasError)"
+    booleans: "Prefixed with is/has/can/should"
+
+# Version and metadata
+metadata:
+  bmad_version: "1.0"
+  created: "2025-10-20"
+  updated: "2025-10-20"
+  owner: "Development Team"
