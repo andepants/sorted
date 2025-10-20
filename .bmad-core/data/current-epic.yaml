@@ -10,7 +10,7 @@ current_epic:
   stories:
     - id: STORY-0.1
       title: "Initialize Xcode Project"
-      status: pending
+      status: ready_to_work
       file: null  # Will be created by SM
 
     - id: STORY-0.2

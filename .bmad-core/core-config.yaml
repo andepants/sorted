@@ -1,8 +1,8 @@
-# BMAD Core Configuration - MessageAI Project
+# BMAD Core Configuration - Sorted Project
 # This file defines project-wide settings for all BMAD agents
 
 project:
-  name: MessageAI
+  name: Sorted
   type: iOS Native Messaging App
   description: AI-first iOS messaging application with real-time chat and intelligent conversation management
 
@@ -29,7 +29,7 @@ project:
     architecture: docs/architecture/
     epics: docs/epics/
     stories: docs/stories/
-    source: MessageAI/
+    source: Sorted/
     bmad_core: .bmad-core/
     bmad_agents: .claude/BMad/
 
@@ -127,13 +127,13 @@ firebase:
 
   environments:
     development:
-      bundle_id: com.messageai.app.dev
+      bundle_id: com.sorted.app.dev
       use_emulators: true
     staging:
-      bundle_id: com.messageai.app.staging
+      bundle_id: com.sorted.app.staging
       use_emulators: false
     production:
-      bundle_id: com.messageai.app
+      bundle_id: com.sorted.app
       use_emulators: false
 
 # BMAD workflow rules

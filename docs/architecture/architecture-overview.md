@@ -4,7 +4,7 @@
 
 **Mobile-First, Offline-First, AI-Enhanced**
 
-MessageAI is built with four foundational principles:
+Sorted is built with four foundational principles:
 
 1. **Offline-First**: Write local first, sync to cloud. App works without network.
 2. **AI as Copilot**: AI suggests, user decides. Never auto-send messages.

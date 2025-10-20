@@ -1,8 +1,8 @@
-# SwiftData Implementation Guide - MessageAI
+# SwiftData Implementation Guide - Sorted
 
 **Version:** 1.0
 **Last Updated:** October 20, 2025
-**Purpose:** Complete SwiftData implementation patterns with code examples for MessageAI
+**Purpose:** Complete SwiftData implementation patterns with code examples for Sorted
 
 ---
 
@@ -706,7 +706,7 @@ enum FAQCategory: String, Codable, CaseIterable {
 Complete ModelContainer configuration in the main App file.
 
 ```swift
-/// MessageAIApp.swift
+/// SortedApp.swift
 ///
 /// Main app entry point with SwiftData ModelContainer configuration.
 /// Sets up the data model schema and initializes the container.
@@ -717,7 +717,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct MessageAIApp: App {
+struct SortedApp: App {
     // MARK: - Properties
 
     /// Shared model container for the app
@@ -1655,7 +1655,7 @@ func deleteOldMessages(olderThan days: Int) {
 
 ## Summary
 
-This guide provides complete SwiftData implementation patterns for MessageAI:
+This guide provides complete SwiftData implementation patterns for Sorted:
 
 ✅ **@Model Entities**: All 5 core entities with full property definitions and relationships
 ✅ **ModelContainer Setup**: App initialization with schema configuration

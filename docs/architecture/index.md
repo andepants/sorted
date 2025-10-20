@@ -1,4 +1,4 @@
-# MessageAI - High-Level Technical Architecture
+# Sorted - High-Level Technical Architecture
 
 **Version:** 1.0
 **Last Updated:** October 20, 2025

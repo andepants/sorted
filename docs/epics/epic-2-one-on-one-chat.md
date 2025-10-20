@@ -573,7 +573,7 @@ Implement the core one-on-one messaging infrastructure with SwiftData local pers
        @Published var pendingCount = 0
 
        private let monitor = NWPathMonitor()
-       private let queue = DispatchQueue(label: "com.messageai.sync")
+       private let queue = DispatchQueue(label: "com.sorted.sync")
        private let modelContext: ModelContext
 
        init() {

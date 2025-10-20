@@ -488,12 +488,12 @@ Enable users to share images, videos, and files within conversations. Includes m
 - [ ] Failed image loads show broken image icon
 
 **Technical Tasks:**
-1. Configure Kingfisher in MessageAIApp.swift:
+1. Configure Kingfisher in SortedApp.swift:
    ```swift
    import Kingfisher
 
    @main
-   struct MessageAIApp: App {
+   struct SortedApp: App {
        init() {
            FirebaseApp.configure()
 

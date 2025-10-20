@@ -10,7 +10,7 @@
 
 ## Overview
 
-Implement complete user authentication system using Firebase Auth with email/password, including sign up, login, password reset, persistent sessions via Keychain, and basic user profile management. This epic establishes the foundation for all user-specific features in the MessageAI app.
+Implement complete user authentication system using Firebase Auth with email/password, including sign up, login, password reset, persistent sessions via Keychain, and basic user profile management. This epic establishes the foundation for all user-specific features in the Sorted app.
 
 ---
 
@@ -32,7 +32,7 @@ Implement complete user authentication system using Firebase Auth with email/pas
 ## User Stories
 
 ### Story 1.1: User Sign Up with Email/Password
-**As a content creator, I can sign up with email/password so I can create an account and access MessageAI.**
+**As a content creator, I can sign up with email/password so I can create an account and access Sorted.**
 
 **Acceptance Criteria:**
 - [ ] Sign up screen with email, password, confirm password, display name fields
@@ -180,7 +180,7 @@ func createUser(email: String, password: String, displayName: String) async thro
 import Security
 
 class KeychainService {
-    private let service = "com.messageai.app"
+    private let service = "com.sorted.app"
     private let account = "firebase_auth_token"
 
     func save(token: String) throws {
@@ -267,7 +267,7 @@ enum KeychainError: Error {
    - Check Keychain for token
    - Verify token with Firebase: `Auth.auth().currentUser`
    - Fetch user data from Firestore
-4. Update `MessageAIApp.swift`:
+4. Update `SortedApp.swift`:
    - Use `RootView` as initial view instead of hardcoded ContentView
 5. Testing:
    - Test app launch with valid token (should auto-login)
