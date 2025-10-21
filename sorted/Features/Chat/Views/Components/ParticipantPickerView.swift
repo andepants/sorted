@@ -121,7 +121,6 @@ struct ParticipantPickerView: View {
 
             // Sort alphabetically by display name
             users = fetchedUsers.sorted { $0.displayName < $1.displayName }
-
         } catch {
             errorMessage = "Failed to load users: \(error.localizedDescription)"
         }

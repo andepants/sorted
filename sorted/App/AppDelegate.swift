@@ -19,10 +19,10 @@
 /// Created: 2025-10-20
 /// Last Modified: 2025-10-21
 
-import FirebaseCore
-import FirebaseDatabase
-import FirebaseFirestore
-import FirebaseMessaging
+@preconcurrency import FirebaseCore
+@preconcurrency import FirebaseDatabase
+@preconcurrency import FirebaseFirestore
+@preconcurrency import FirebaseMessaging
 import UIKit
 import UserNotifications
 

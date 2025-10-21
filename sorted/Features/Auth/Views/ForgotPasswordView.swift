@@ -2,7 +2,7 @@
 /// Password reset screen with email input
 /// [Source: Epic 1, Story 1.4]
 
-import FirebaseAuth
+@preconcurrency import FirebaseAuth
 import SwiftUI
 
 /// View for password reset via email

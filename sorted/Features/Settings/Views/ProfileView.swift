@@ -3,7 +3,7 @@
 /// [Source: Epic 1, Stories 1.5, 1.6]
 
 import Combine
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import PhotosUI
 import SwiftUI
 

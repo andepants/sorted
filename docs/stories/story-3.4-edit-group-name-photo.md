@@ -533,6 +533,342 @@ func uploadGroupPhoto(
 
 ---
 
+## Dev Notes
+
+**CRITICAL: This section contains ALL implementation context needed. Developer should NOT need to read external docs.**
+
+### EditGroupInfoView Implementation Pattern
+[Source: epic-3-group-chat.md lines 961-1102]
+
+**Sheet Presentation from GroupInfoView:**
+```swift
+// In GroupInfoView
+@State private var showEditSheet = false
+
+// "Edit Group Info" button (admin-only)
+if isAdmin {
+    Button("Edit Group Info") {
+        showEditSheet = true
+    }
+    .buttonStyle(.bordered)
+}
+
+.sheet(isPresented: $showEditSheet) {
+    NavigationStack {
+        EditGroupInfoView(conversation: conversation)
+    }
+}
+```
+
+**EditGroupInfoView Structure:**
+```swift
+struct EditGroupInfoView: View {
+    let conversation: ConversationEntity
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var groupName: String
+    @State private var groupPhoto: UIImage?
+    @State private var showImagePicker = false
+    @State private var isUploading = false
+    @State private var uploadProgress: Double = 0
+
+    init(conversation: ConversationEntity) {
+        self.conversation = conversation
+        _groupName = State(initialValue: conversation.displayName ?? "")
+    }
+
+    // Form with photo, name, character count, save/cancel buttons
+}
+```
+
+### Photo Upload with Progress and Compression
+[Source: epic-3-group-chat.md lines 1058-1069, Story 3.1]
+
+**StorageService.uploadGroupPhoto() with Progress:**
+```swift
+// In StorageService (ALREADY EXISTS from Story 3.1)
+func uploadGroupPhoto(
+    _ image: UIImage,
+    groupID: String,
+    progressHandler: @escaping (Double) -> Void
+) async throws -> String {
+    // Compress if needed
+    var imageData = image.jpegData(compressionQuality: 0.8)
+    if let data = imageData, data.count > 5 * 1024 * 1024 {
+        // Compress to max 5MB
+        imageData = image.jpegData(compressionQuality: 0.4)
+    }
+
+    guard let data = imageData else {
+        throw StorageError.compressionFailed
+    }
+
+    // Upload to Storage
+    let storageRef = Storage.storage().reference()
+    let photoRef = storageRef.child("group_photos/\(groupID)/photo.jpg")
+
+    let metadata = StorageMetadata()
+    metadata.contentType = "image/jpeg"
+
+    // Upload with progress
+    let uploadTask = photoRef.putData(data, metadata: metadata)
+
+    uploadTask.observe(.progress) { snapshot in
+        let progress = Double(snapshot.progress?.fractionCompleted ?? 0)
+        progressHandler(progress)
+    }
+
+    let _ = try await uploadTask
+
+    // Get download URL
+    let url = try await photoRef.downloadURL()
+    return url.absoluteString
+}
+```
+
+**Progress UI Overlay:**
+```swift
+.overlay {
+    if isUploading {
+        VStack(spacing: 12) {
+            ProgressView(value: uploadProgress, total: 1.0)
+                .progressViewStyle(.linear)
+            Text("Uploading... \(Int(uploadProgress * 100))%")
+                .font(.caption)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(10)
+        .shadow(radius: 10)
+    }
+}
+```
+
+### System Message for Name Change Only
+[Source: epic-3-group-chat.md lines 1078-1096]
+
+**CRITICAL: Only send system message if name changed**
+
+```swift
+private func saveChanges() async {
+    let oldName = conversation.displayName
+
+    // Update group name
+    conversation.displayName = groupName
+    conversation.updatedAt = Date()
+    try? modelContext.save()
+
+    // Upload new photo if changed
+    if let photo = groupPhoto {
+        isUploading = true
+
+        do {
+            let url = try await StorageService.shared.uploadGroupPhoto(
+                photo,
+                groupID: conversation.id,
+                progressHandler: { progress in
+                    uploadProgress = progress
+                }
+            )
+            conversation.groupPhotoURL = url
+            try? modelContext.save()
+        } catch {
+            // Show error toast
+            print("Photo upload failed: \(error)")
+        }
+
+        isUploading = false
+    }
+
+    // Sync to RTDB
+    conversation.syncStatus = .pending
+    try? modelContext.save()
+
+    Task.detached {
+        try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+        // Post system message ONLY if name changed
+        if oldName != groupName {
+            let currentUserDisplayName = try await ConversationService.shared.fetchDisplayName(
+                for: AuthService.shared.currentUserID ?? ""
+            ) ?? "Someone"
+
+            let systemMessage = MessageEntity(
+                id: UUID().uuidString,
+                conversationID: conversation.id,
+                senderID: "system",
+                text: "\(currentUserDisplayName) changed the group name to \"\(groupName)\"",
+                createdAt: Date(),
+                status: .sent,
+                syncStatus: .synced,
+                isSystemMessage: true
+            )
+
+            try? await MessageService.shared.sendMessageToRTDB(systemMessage)
+        }
+    }
+
+    dismiss()
+}
+```
+
+**System Message Format:**
+- Name change: "{AdminName} changed the group name to \"{NewName}\""
+- **NO system message for photo-only changes**
+
+### Concurrent Edit Conflict Detection
+[Source: epic-3-group-chat.md lines 1048-1100]
+
+**Pattern: Check if name changed by another admin**
+
+```swift
+private func saveChanges() async {
+    // Before saving, check if another admin changed the name
+    let currentGroupName = conversation.displayName
+
+    // Fetch latest from RTDB (optional - for conflict detection)
+    let latestSnapshot = try? await Database.database().reference()
+        .child("conversations")
+        .child(conversation.id)
+        .child("groupName")
+        .getData()
+
+    let latestName = latestSnapshot?.value as? String
+
+    if let latestName = latestName, latestName != currentGroupName {
+        // Another admin changed the name
+        showConflictToast = true
+        conflictMessage = "Group name was updated by another admin"
+        // Option 1: Overwrite anyway
+        // Option 2: Cancel and reload
+        return
+    }
+
+    // Proceed with save...
+}
+```
+
+**Conflict Resolution Options:**
+1. Show toast: "Group name was updated by another admin"
+2. Provide buttons: "Overwrite" or "Cancel"
+3. If overwrite → proceed with save
+4. If cancel → dismiss sheet, reload GroupInfoView
+
+### Character Count Validation
+[Source: epic-3-group-chat.md lines 961-1102]
+
+**Group Name Validation:**
+- **Minimum:** 1 character (non-empty)
+- **Maximum:** 50 characters
+- **Real-time character count:** Display "\(groupName.count)/50 characters"
+
+```swift
+TextField("Group Name", text: $groupName)
+    .font(.system(size: 18))
+
+Text("\(groupName.count)/50 characters")
+    .font(.system(size: 12))
+    .foregroundColor(.secondary)
+
+// Save button disabled if invalid
+Button("Save") {
+    Task { await saveChanges() }
+}
+.disabled(groupName.isEmpty || groupName.count > 50)
+```
+
+### ImagePicker Integration
+[Source: Story 3.1, epic-3-COMPONENT-SPECS.md]
+
+**ImagePicker Component (Already Created in Story 3.1):**
+```swift
+// In EditGroupInfoView
+@State private var showImagePicker = false
+@State private var groupPhoto: UIImage?
+
+Button(action: { showImagePicker = true }) {
+    if let photo = groupPhoto {
+        Image(uiImage: photo)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 100, height: 100)
+            .clipShape(Circle())
+    } else {
+        AsyncImage(url: URL(string: conversation.groupPhotoURL ?? "")) { image in
+            image.resizable().scaledToFill()
+        } placeholder: {
+            Circle().fill(Color.gray.opacity(0.3))
+                .overlay {
+                    Image(systemName: "camera.fill")
+                }
+        }
+        .frame(width: 100, height: 100)
+        .clipShape(Circle())
+    }
+}
+
+.sheet(isPresented: $showImagePicker) {
+    ImagePicker(image: $groupPhoto)
+}
+```
+
+### Upload Cancellation Pattern
+[Source: epic-3-group-chat.md lines 1058-1069]
+
+**Allow Upload Cancellation:**
+```swift
+@State private var uploadTask: StorageUploadTask?
+
+// During upload
+uploadTask = photoRef.putData(data, metadata: metadata)
+
+// Cancel button in overlay
+Button("Cancel Upload") {
+    uploadTask?.cancel()
+    isUploading = false
+    groupPhoto = nil  // Revert to old photo
+}
+```
+
+### File Modification Order
+
+**CRITICAL: Follow this exact sequence:**
+
+1. ✅ Update `ConversationEntity.swift` - **Already done in Story 3.1**
+2. ✅ Create `ImagePicker.swift` - **Already done in Story 3.1**
+3. ✅ Update `StorageService.swift` (uploadGroupPhoto method) - **Already done in Story 3.1**
+4. Create `EditGroupInfoView.swift` (main implementation)
+5. Update `GroupInfoView.swift` (add "Edit Group Info" button)
+
+### Testing Standards
+
+**Manual Testing Required (No Unit Tests for MVP):**
+- Test name change (valid, empty, 51 chars)
+- Test photo upload (small, large, 5MB+, upload failure, cancellation)
+- Test upload progress (0-100%)
+- Test concurrent edit conflict (two admins editing simultaneously)
+- Test offline edit (queue for sync)
+- Test system message (name change only, not photo-only)
+
+**CRITICAL Edge Cases:**
+1. Empty name → "Save" disabled
+2. 51+ character name → "Save" disabled
+3. Photo upload fails → show error toast with retry
+4. Cancel during upload → revert to old photo
+5. Concurrent edit by another admin → show conflict toast
+6. Offline edit → queued, synced when online
+7. Photo-only change → NO system message sent
+
+**Upload Error Scenarios:**
+- Network error → "Upload failed: Network error" + retry button
+- Storage quota exceeded → "Upload failed: Storage quota exceeded"
+- Permission denied → "Upload failed: Permission denied"
+- Large file → Compress before upload (max 5MB)
+
+---
+
 ## Metadata
 
 **Created by:** @sm (Scrum Master Bob)
@@ -542,6 +878,45 @@ func uploadGroupPhoto(
 **Epic:** Epic 3: Group Chat
 **Story points:** 2
 **Priority:** P1
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-21 | 1.0 | Initial story creation | @sm (Scrum Master Bob) |
+| 2025-10-21 | 1.1 | Added Dev Notes section per template compliance | @po (Product Owner Sarah) |
+
+---
+
+## Dev Agent Record
+
+**This section is populated by the @dev agent during implementation.**
+
+### Agent Model Used
+
+*Agent model name and version will be recorded here by @dev*
+
+### Debug Log References
+
+*Links to debug logs or traces generated during development will be recorded here by @dev*
+
+### Completion Notes
+
+*Notes about task completion and any issues encountered will be recorded here by @dev*
+
+### File List
+
+*All files created, modified, or affected during story implementation will be listed here by @dev*
+
+---
+
+## QA Results
+
+**This section is populated by the @qa agent after reviewing the completed story implementation.**
+
+*QA validation results, test outcomes, and any issues found will be recorded here by @qa*
 
 ---
 

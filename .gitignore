@@ -153,3 +153,7 @@ yarn-error.log*
 # BMAD (optional - if you want to ignore BMAD-generated files)
 # .bmad-core/
 # .claude/
+
+# Ignore GoogleService-Info.plist anywhere in the project
+**/GoogleService-Info.plist
+**/GoogleService-Info-*.plist

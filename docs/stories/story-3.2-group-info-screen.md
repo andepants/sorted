@@ -443,6 +443,263 @@ private func leaveGroup() async {
 
 ---
 
+## Dev Notes
+
+**CRITICAL: This section contains ALL implementation context needed. Developer should NOT need to read external docs.**
+
+### SwiftData Query Patterns for Participants
+[Source: docs/swiftdata-implementation-guide.md]
+
+**Fetching Multiple Users by ID:**
+```swift
+// In GroupInfoView.loadParticipants()
+let participantIDs = conversation.participantIDs
+let descriptor = FetchDescriptor<UserEntity>(
+    predicate: #Predicate<UserEntity> { user in
+        participantIDs.contains(user.id)
+    }
+)
+let participants = try? modelContext.fetch(descriptor)
+```
+
+**IMPORTANT:** SwiftData predicates must use constants, not variables. Store `participantIDs` in local variable before using in predicate.
+
+### Leave Group Logic with Admin Transfer
+[Source: epic-3-group-chat.md lines 721-755]
+
+**Last Admin Detection Pattern:**
+```swift
+let currentUserID = AuthService.shared.currentUserID ?? ""
+let isLastAdmin = conversation.adminUserIDs.count == 1 &&
+                  conversation.adminUserIDs.contains(currentUserID)
+let hasOtherParticipants = conversation.participantIDs.count > 1
+
+if isLastAdmin && hasOtherParticipants {
+    // MUST show admin transfer dialog
+    // Options:
+    // 1. Transfer to specific user (show picker)
+    // 2. Auto-assign to oldest member
+    showAdminTransferDialog = true
+    return
+}
+```
+
+**Admin Transfer Dialog (Story 3.3 Dependency):**
+- If Story 3.3 not implemented yet: Auto-assign oldest member
+- If Story 3.3 implemented: Show ParticipantPicker to select new admin
+
+**Leave Group Sequence:**
+```swift
+1. Check if last admin with participants → transfer/prevent
+2. Remove currentUserID from participantIDs
+3. Remove currentUserID from adminUserIDs
+4. Set isArchived = true (local only, not synced)
+5. Set syncStatus = .pending
+6. Save SwiftData
+7. Sync to RTDB (ConversationService.syncConversationToRTDB)
+8. Send system message: "{DisplayName} left the group"
+9. Dismiss view and navigate back
+```
+
+### System Message Standards
+[Source: epic-3-group-chat.md lines 1078-1096, Story 3.1]
+
+**Required Fields for System Messages:**
+```swift
+MessageEntity(
+    id: UUID().uuidString,
+    conversationID: conversation.id,
+    senderID: "system",              // MUST be "system"
+    text: "{User} left the group",   // Action description
+    createdAt: Date(),
+    status: .sent,
+    syncStatus: .synced,             // System messages sync immediately
+    isSystemMessage: true            // CRITICAL flag
+)
+```
+
+**System Message Text Formats:**
+- Leave: "{DisplayName} left the group"
+- Remove: "{AdminName} removed {ParticipantName}"
+
+### Navigation Integration with MessageThreadView
+[Source: epic-3-group-chat.md lines 593-598]
+
+**MessageThreadView Navigation Bar Update:**
+```swift
+// In MessageThreadView
+.navigationTitle(conversation.displayName ?? "Chat")
+.navigationBarTitleDisplayMode(.inline)
+.toolbar {
+    ToolbarItem(placement: .principal) {
+        Button {
+            if conversation.isGroup {
+                showGroupInfo = true
+            }
+        } label: {
+            VStack {
+                Text(conversation.displayName ?? "Chat")
+                    .font(.headline)
+                if conversation.isGroup {
+                    Text("\(conversation.participantIDs.count) participants")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+.sheet(isPresented: $showGroupInfo) {
+    NavigationStack {
+        GroupInfoView(conversation: conversation)
+    }
+}
+```
+
+### Participant Removal (Admin Only)
+[Source: epic-3-group-chat.md lines 689-719]
+
+**CRITICAL: Concurrent Removal Prevention**
+```swift
+func removeParticipant(_ participant: UserEntity) async {
+    // Check if participant still in group (prevent concurrent removal errors)
+    guard conversation.participantIDs.contains(participant.id) else {
+        print("Participant already removed")
+        return
+    }
+
+    conversation.participantIDs.removeAll { $0 == participant.id }
+    conversation.adminUserIDs.removeAll { $0 == participant.id }
+    conversation.updatedAt = Date()
+    conversation.syncStatus = .pending
+    try? modelContext.save()
+
+    // Sync to RTDB
+    try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+    // Send system message
+    let adminName = AuthService.shared.currentUser?.displayName ?? "Someone"
+    let systemMessage = MessageEntity(
+        id: UUID().uuidString,
+        conversationID: conversation.id,
+        senderID: "system",
+        text: "\(adminName) removed \(participant.displayName)",
+        createdAt: Date(),
+        status: .sent,
+        syncStatus: .synced,
+        isSystemMessage: true
+    )
+    try? await MessageService.shared.sendMessageToRTDB(systemMessage)
+
+    // Reload participants
+    await loadParticipants()
+}
+```
+
+### Deleted User Handling
+[Source: epic-3-group-chat.md lines 584-588]
+
+**Firestore Fetch with Fallback:**
+```swift
+// If UserEntity not in SwiftData, fetch from Firestore
+let userDoc = try? await Firestore.firestore()
+    .collection("users")
+    .document(userID)
+    .getDocument()
+
+if let data = userDoc?.data() {
+    // User exists
+    let displayName = data["displayName"] as? String ?? "Unknown"
+    let profilePictureURL = data["profilePictureURL"] as? String
+} else {
+    // User deleted
+    displayName = "Deleted User"
+    profilePictureURL = nil  // Show placeholder avatar
+}
+```
+
+**Placeholder Avatar for Deleted Users:**
+```swift
+AsyncImage(url: URL(string: participant.profilePictureURL ?? "")) { image in
+    image.resizable().scaledToFill()
+} placeholder: {
+    Circle().fill(Color.gray.opacity(0.3))
+        .overlay {
+            Image(systemName: "person.fill")
+                .foregroundColor(.white)
+        }
+}
+```
+
+### Lazy Loading for Large Groups
+[Source: epic-3-group-chat.md lines 584]
+
+**Performance Pattern:**
+```swift
+Section("Participants") {
+    // Use LazyVStack for 50+ participants
+    LazyVStack {
+        ForEach(participants) { participant in
+            ParticipantRow(participant: participant, ...)
+        }
+    }
+}
+```
+
+**CRITICAL:** Use `.task { await loadParticipants() }` NOT `.onAppear` to avoid race conditions.
+
+### Auto-Dismiss if Removed While Viewing
+[Source: epic-3-group-chat.md lines 743]
+
+**RTDB Listener for Removal Detection:**
+```swift
+// In GroupInfoView
+.task {
+    // Listen to conversation changes
+    let conversationRef = Database.database().reference()
+        .child("conversations")
+        .child(conversation.id)
+        .child("participantIDs")
+
+    conversationRef.observe(.value) { snapshot in
+        guard let participantIDs = snapshot.value as? [String: Bool] else { return }
+        let currentUserID = AuthService.shared.currentUserID ?? ""
+
+        // If current user removed, dismiss view
+        if !participantIDs.keys.contains(currentUserID) {
+            dismiss()
+        }
+    }
+}
+```
+
+### File Modification Order
+
+**CRITICAL: Follow this exact sequence to avoid compile errors:**
+
+1. ✅ Update `ConversationEntity.swift` - **Already done in Story 3.1**
+2. ✅ Update `MessageEntity.swift` - **Already done in Story 3.1**
+3. Create `GroupInfoView.swift` (main implementation)
+4. Update `MessageThreadView.swift` (navigation integration)
+5. ✅ Update `ConversationService.swift` (if needed for removal sync)
+
+### Testing Standards
+
+**Manual Testing Required (No Unit Tests for MVP):**
+- Test as admin and non-admin (permission visibility)
+- Test leave group (normal, last admin with participants, sole member)
+- Test remove participant (concurrent removal, deleted users)
+- Test large groups (50+ participants for lazy loading)
+- Test offline scenarios (leave/remove queued for sync)
+
+**CRITICAL Edge Cases:**
+1. Last admin leaving with participants → admin transfer dialog
+2. User removed while viewing GroupInfoView → auto-dismiss
+3. Concurrent removal by two admins → no duplicate errors
+4. Deleted user accounts → "Deleted User" placeholder
+
+---
+
 ## Metadata
 
 **Created by:** @sm (Scrum Master Bob)
@@ -452,6 +709,45 @@ private func leaveGroup() async {
 **Epic:** Epic 3: Group Chat
 **Story points:** 3
 **Priority:** P1
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-21 | 1.0 | Initial story creation | @sm (Scrum Master Bob) |
+| 2025-10-21 | 1.1 | Added Dev Notes section per template compliance | @po (Product Owner Sarah) |
+
+---
+
+## Dev Agent Record
+
+**This section is populated by the @dev agent during implementation.**
+
+### Agent Model Used
+
+*Agent model name and version will be recorded here by @dev*
+
+### Debug Log References
+
+*Links to debug logs or traces generated during development will be recorded here by @dev*
+
+### Completion Notes
+
+*Notes about task completion and any issues encountered will be recorded here by @dev*
+
+### File List
+
+*All files created, modified, or affected during story implementation will be listed here by @dev*
+
+---
+
+## QA Results
+
+**This section is populated by the @qa agent after reviewing the completed story implementation.**
+
+*QA validation results, test outcomes, and any issues found will be recorded here by @qa*
 
 ---
 
