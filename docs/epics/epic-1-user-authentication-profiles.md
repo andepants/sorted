@@ -18,14 +18,20 @@ Implement complete user authentication system using Firebase Auth with email/pas
 
 - ✅ Email/password authentication via Firebase Auth
 - ✅ Sign up flow with email validation
+- ✅ **Instagram-style displayName validation (3-30 chars, alphanumeric + _ + .)**
+- ✅ **DisplayName uniqueness enforcement (Firestore + Security Rules)**
 - ✅ Login flow with error handling
 - ✅ Password reset via email
 - ✅ Persistent sessions (auto-login after app restart)
 - ✅ Secure token storage in iOS Keychain
-- ✅ User profile creation in Firestore
+- ✅ User profile creation in Firestore (static data)
+- ✅ **User presence tracking in Realtime Database**
 - ✅ Profile picture upload to Firebase Storage
-- ✅ Display name management
+- ✅ Display name management with uniqueness validation
 - ✅ Logout functionality with local data cleanup
+- ✅ **Firebase Security Rules deployed (Firestore, Realtime DB, Storage)**
+
+**🔧 MCP Tools Available:** Firebase MCP and XcodeBuild MCP can automate testing and deployment throughout this epic.
 
 ---
 
