@@ -103,19 +103,3 @@ final class AttachmentEntity {
         uploadStatus == .completed && url != nil
     }
 }
-
-// MARK: - Supporting Enums
-
-enum AttachmentType: String, Codable {
-    case image
-    case video
-    case audio
-    case document
-}
-
-enum UploadStatus: String, Codable {
-    case pending
-    case uploading
-    case completed
-    case failed
-}

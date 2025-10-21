@@ -27,8 +27,6 @@ final class ConversationService {
     /// - Parameter conversation: The conversation entity to sync
     /// - Throws: Error if RTDB write fails
     func syncConversation(_ conversation: ConversationEntity) async throws {
-        let conversationRef = database.child("conversations/\(conversation.id)")
-
         // Convert participantIDs array to object for security rules
         var participantsObject: [String: Bool] = [:]
         for participantID in conversation.participantIDs {
@@ -59,19 +57,19 @@ final class ConversationService {
             conversationData["adminUserIDs"] = adminObject
         }
 
-        try await conversationRef.setValue(conversationData)
+        // Inline reference to avoid Swift 6 concurrency warnings
+        try await database.child("conversations/\(conversation.id)").setValue(conversationData)
     }
 
     /// Finds a conversation by ID in RTDB
     /// - Parameter id: The conversation ID to find
     /// - Returns: ConversationEntity if found, nil otherwise
     func findConversation(id: String) async throws -> ConversationEntity? {
-        let conversationRef = database.child("conversations/\(id)")
-
         // Use getData() with error handling for non-existent conversations
         // Note: Will return nil for permission denied (expected when conversation doesn't exist)
         do {
-            let snapshot = try await conversationRef.getData()
+            // Inline reference to avoid Swift 6 concurrency warnings
+            let snapshot = try await database.child("conversations/\(id)").getData()
 
             guard snapshot.exists(),
                   let conversationData = snapshot.value as? [String: Any] else {
@@ -173,8 +171,8 @@ final class ConversationService {
             return false
         }
 
-        let blockedRef = database.child("users/\(currentUserID)/blockedUsers/\(userID)")
-        let snapshot = try await blockedRef.getData()
+        // Inline reference to avoid Swift 6 concurrency warnings
+        let snapshot = try await database.child("users/\(currentUserID)/blockedUsers/\(userID)").getData()
         return snapshot.exists()
     }
 }

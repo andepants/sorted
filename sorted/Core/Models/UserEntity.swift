@@ -113,13 +113,3 @@ final class UserEntity {
         self.updatedAt = Date()
     }
 }
-
-// MARK: - Supporting Enums
-
-enum AIFeature {
-    case categorization
-    case smartReply
-    case faq
-    case sentiment
-    case opportunityScoring
-}

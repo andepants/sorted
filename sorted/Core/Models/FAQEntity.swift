@@ -84,14 +84,3 @@ final class FAQEntity {
         self.updatedAt = Date()
     }
 }
-
-// MARK: - Supporting Enums
-
-enum FAQCategory: String, Codable, CaseIterable {
-    case equipment = "Equipment"
-    case software = "Software"
-    case business = "Business"
-    case personal = "Personal"
-    case career = "Career"
-    case other = "Other"
-}
