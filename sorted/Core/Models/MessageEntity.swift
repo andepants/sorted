@@ -24,8 +24,17 @@ final class MessageEntity {
     /// Message text content
     var text: String
 
-    /// Message creation timestamp
-    var createdAt: Date
+    /// Client timestamp for immediate display (never nil)
+    /// Used as primary sort key for null-safe sorting (Pattern 4)
+    var localCreatedAt: Date
+
+    /// Server timestamp from RTDB (authoritative ordering)
+    /// Can be nil for pending messages not yet synced
+    var serverTimestamp: Date?
+
+    /// Server-assigned sequence number for ordering
+    /// Detects gaps in message stream for out-of-order delivery
+    var sequenceNumber: Int64?
 
     /// Last update timestamp
     var updatedAt: Date
@@ -47,10 +56,15 @@ final class MessageEntity {
     /// Sync error message (if failed)
     var syncError: String?
 
+    // MARK: - Message Type
+
+    /// Is this a system message? (e.g., "Alice joined the group")
+    var isSystemMessage: Bool
+
     // MARK: - Read Receipts
 
-    /// Array of user IDs who have read this message
-    var readBy: [String]
+    /// Dictionary of user IDs to read timestamps (userID -> when they read the message)
+    var readBy: [String: Date]
 
     // MARK: - AI Metadata
 
@@ -98,20 +112,26 @@ final class MessageEntity {
         conversationID: String,
         senderID: String,
         text: String,
-        createdAt: Date = Date(),
+        localCreatedAt: Date = Date(),
+        serverTimestamp: Date? = nil,
+        sequenceNumber: Int64? = nil,
         status: MessageStatus = .sending,
-        syncStatus: SyncStatus = .pending
+        syncStatus: SyncStatus = .pending,
+        isSystemMessage: Bool = false
     ) {
         self.id = id
         self.conversationID = conversationID
         self.senderID = senderID
         self.text = text
-        self.createdAt = createdAt
-        self.updatedAt = createdAt
+        self.localCreatedAt = localCreatedAt
+        self.serverTimestamp = serverTimestamp
+        self.sequenceNumber = sequenceNumber
+        self.updatedAt = localCreatedAt
         self.status = status
         self.syncStatus = syncStatus
         self.retryCount = 0
-        self.readBy = []
+        self.isSystemMessage = isSystemMessage
+        self.readBy = [:]
         self.attachments = []
     }
 
@@ -152,6 +172,13 @@ enum MessageStatus: String, Codable {
     case delivered
     case read
 }
+
+// MARK: - Story 2.3 Note
+// MessageStatus aligned with RTDB sync requirements:
+// - .sending: Local optimistic UI (before RTDB sync)
+// - .sent: RTDB synced successfully
+// - .delivered: Recipient device received (FCM confirmation)
+// - .read: Recipient opened and viewed message
 
 enum SyncStatus: String, Codable {
     case pending

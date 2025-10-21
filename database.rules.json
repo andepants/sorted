@@ -1,50 +1,192 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
-
     "users": {
-      "$userId": {
+      "$uid": {
+        // Anyone authenticated can read basic profile info
         ".read": "auth != null",
-        ".write": "auth.uid === $userId"
+
+        // Only the user can update their own profile
+        ".write": "auth != null && auth.uid == $uid",
+
+        // NOTE: User profiles (displayName, email, fcmToken) are stored in FIRESTORE, NOT RTDB
+        // RTDB /users only stores real-time ephemeral data (online status, blocked users)
+        // See Epic 2 "Data Architecture Boundaries" section for complete details
+
+        // Blocked users list (object structure for efficient lookups)
+        "blockedUsers": {
+          "$blockedUid": {
+            ".validate": "newData.val() == true"
+          }
+        }
       }
     },
 
     "conversations": {
-      "$conversationId": {
-        ".read": "auth != null && data.child('participants').child(auth.uid).exists()",
-        ".write": "auth != null && (data.child('participants').child(auth.uid).exists() || newData.child('participants').child(auth.uid).exists())",
+      "$conversationID": {
+        // Users can read if they are a participant
+        ".read": "auth != null && data.child('participants').child(auth.uid).val() == true",
 
-        "messages": {
-          "$messageId": {
-            ".read": "auth != null && (root.child('conversations').child($conversationId).child('participants').child(auth.uid).exists())",
-            ".write": "auth != null && (root.child('conversations').child($conversationId).child('participants').child(auth.uid).exists())",
-            ".validate": "newData.hasChildren(['senderId', 'text', 'timestamp']) && newData.child('senderId').val() === auth.uid"
+        // Users can write if they are a participant OR if creating new conversation where they are a participant
+        // For group conversations, only admins can modify group settings
+        ".write": "auth != null && (
+          // New conversation: must be a participant
+          (!data.exists() && newData.child('participants').child(auth.uid).val() == true) ||
+          // Existing conversation: participant can update
+          (data.exists() && data.child('participants').child(auth.uid).val() == true && (
+            // If not modifying admin-only fields, any participant can update
+            (!newData.child('isGroup').exists() || newData.child('isGroup').val() == false) ||
+            // If modifying group fields, must be an admin
+            (newData.child('isGroup').val() == true && (
+              // Check if modifying admin-only fields
+              (newData.child('groupName').val() == data.child('groupName').val() &&
+               newData.child('groupPhotoURL').val() == data.child('groupPhotoURL').val() &&
+               newData.child('participantList').val().length == data.child('participantList').val().length) ||
+              // If modifying, must be admin
+              data.child('adminUserIDs').child(auth.uid).val() == true
+            ))
+          ))
+        )",
+
+        // Validate conversation structure
+        ".validate": "newData.hasChildren(['participants', 'participantList', 'createdAt'])",
+
+        // Participants stored as object for efficient security rule queries
+        "participants": {
+          "$uid": {
+            ".validate": "newData.val() == true"
           }
         },
 
+        // Participant list stored as array for display purposes
+        // Enforce min 2, max 256 participants
+        "participantList": {
+          ".validate": "newData.hasChildren() && newData.val().length >= 2 && newData.val().length <= 256",
+          "$index": {
+            ".validate": "newData.isString()"
+          }
+        },
+
+        // Group-specific fields
+        "isGroup": {
+          ".validate": "newData.isBoolean()"
+        },
+
+        "groupName": {
+          // Only required if isGroup is true; must be 1-50 characters
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length >= 1 && newData.val().length <= 50)"
+        },
+
+        "groupPhotoURL": {
+          ".validate": "!newData.exists() || newData.isString()"
+        },
+
+        "adminUserIDs": {
+          // Object structure for admin user IDs
+          "$adminUid": {
+            ".validate": "newData.val() == true"
+          }
+        },
+
+        "lastMessage": {
+          ".validate": "newData.isString() && newData.val().length <= 200"
+        },
+
+        "lastMessageTimestamp": {
+          ".validate": "newData.isNumber()"
+        },
+
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+
+        "isArchived": {
+          ".validate": "newData.isBoolean()"
+        },
+
+        // Typing indicators (ephemeral data, auto-cleaned with onDisconnect)
         "typing": {
-          "$userId": {
-            ".read": "auth != null",
-            ".write": "auth != null && auth.uid === $userId",
+          "$uid": {
             ".validate": "newData.isBoolean()"
           }
-        },
+        }
+      }
+    },
 
-        "presence": {
-          "$userId": {
-            ".read": "auth != null",
-            ".write": "auth != null && auth.uid === $userId"
+    "messages": {
+      "$conversationID": {
+        // Users can read messages if they are participants in the conversation
+        ".read": "auth != null && root.child('conversations').child($conversationID).child('participants').child(auth.uid).val() == true",
+
+        "$messageID": {
+          // Users can write messages if they are participants in the conversation
+          ".write": "auth != null && root.child('conversations').child($conversationID).child('participants').child(auth.uid).val() == true",
+
+          // Validate message structure
+          ".validate": "newData.hasChildren(['senderID', 'text', 'serverTimestamp', 'status'])",
+
+          "senderID": {
+            // Prevent impersonation - senderID must match authenticated user
+            // Exception: system messages have senderID = "system"
+            ".validate": "(newData.parent().child('isSystemMessage').val() == true && newData.val() == 'system') || (newData.parent().child('isSystemMessage').val() != true && newData.val() == auth.uid)"
+          },
+
+          "isSystemMessage": {
+            ".validate": "!newData.exists() || newData.isBoolean()"
+          },
+
+          "text": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 10000"
+          },
+
+          "serverTimestamp": {
+            ".validate": "newData.isNumber()"
+          },
+
+          "sequenceNumber": {
+            ".validate": "newData.isNumber()"
+          },
+
+          "status": {
+            ".validate": "newData.isString() && (newData.val() == 'sent' || newData.val() == 'delivered' || newData.val() == 'read')"
+          },
+
+          "attachments": {
+            ".validate": "newData.hasChildren()",
+            "$index": {
+              ".validate": "newData.isString()"
+            }
+          },
+
+          "readBy": {
+            // Dictionary of userID -> timestamp (milliseconds since epoch)
+            "$uid": {
+              ".validate": "newData.isNumber()"
+            }
           }
         }
       }
     },
 
     "userPresence": {
-      "$userId": {
+      "$uid": {
+        // Anyone authenticated can read presence status
         ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $userId",
-        ".validate": "newData.hasChildren(['status', 'lastSeen'])"
+
+        // Only the user can update their own presence
+        ".write": "auth != null && auth.uid == $uid",
+
+        // Validate presence data structure
+        "online": {
+          ".validate": "newData.isBoolean()"
+        },
+
+        "lastSeen": {
+          ".validate": "newData.isNumber()"
+        }
       }
     }
   }

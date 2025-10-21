@@ -36,6 +36,22 @@ service firebase.storage {
       allow delete: if isAuthenticated() && isOwner(userId);
     }
 
+    // Group photos
+    match /group_photos/{groupId}/{fileName} {
+      // Anyone can read group photos
+      allow read: if true;
+
+      // Any authenticated user can upload group photos
+      // Note: Admin validation happens in app before upload (Storage rules can't access RTDB)
+      allow write: if isAuthenticated()
+        && isImage()
+        && isValidSize();
+
+      // Any authenticated user can delete group photos
+      // Note: Admin validation happens in app before deletion
+      allow delete: if isAuthenticated();
+    }
+
     // Conversation media (for future use)
     match /conversation_media/{conversationId}/{messageId}/{fileName} {
       allow read: if isAuthenticated();

@@ -4,8 +4,8 @@
 /// Main entry point for the Sorted iOS application.
 /// Configured for Swift 6, iOS 17+, and SwiftUI with SwiftData persistence.
 
-import Firebase
 import FirebaseAuth
+import FirebaseCore
 import FirebaseFirestore
 import FirebaseMessaging
 import FirebaseStorage
@@ -17,58 +17,27 @@ import SwiftUI
 struct SortedApp: App {
     // MARK: - Properties
 
-    /// Shared model container for the app
-    let modelContainer: ModelContainer
+    /// Register AppDelegate for FCM setup and push notification handling
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    // MARK: - Initialization
-
-    init() {
-        // Initialize Firebase
-        FirebaseApp.configure()
-
-        print("✅ Firebase initialized successfully")
-        if let app = FirebaseApp.app() {
-            print("   Project ID: \(app.options.projectID ?? "unknown")")
-            print("   Bundle ID: \(app.options.bundleID ?? "unknown")")
-        }
-
-        // Initialize SwiftData ModelContainer
-        do {
-            // Define the schema with all model types
-            let schema = Schema([
-                MessageEntity.self,
-                ConversationEntity.self,
-                UserEntity.self,
-                AttachmentEntity.self,
-                FAQEntity.self
-            ])
-
-            // Configure model container
-            let modelConfiguration = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                allowsSave: true
-            )
-
-            // Create container
-            modelContainer = try ModelContainer(
-                for: schema,
-                configurations: [modelConfiguration]
-            )
-
-            print("✅ SwiftData ModelContainer initialized successfully")
-            print("   Entities: MessageEntity, ConversationEntity, UserEntity, AttachmentEntity, FAQEntity")
-        } catch {
-            fatalError("❌ Failed to initialize ModelContainer: \(error)")
-        }
-    }
+    /// Network connectivity monitor - initialized ONCE and injected globally
+    @StateObject private var networkMonitor = NetworkMonitor.shared
 
     // MARK: - App Body
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environmentObject(networkMonitor) // Inject network monitor globally
+                .onReceive(NotificationCenter.default.publisher(for: .openConversation)) { notification in
+                    // Handle deep link to conversation when notification is tapped
+                    if let conversationID = notification.userInfo?["conversationID"] as? String {
+                        // Navigate to MessageThreadView
+                        // NOTE: Navigation implementation pending Story 2.3
+                        print("Navigate to conversation: \(conversationID)")
+                    }
+                }
         }
-        .modelContainer(modelContainer)
+        .modelContainer(AppContainer.shared.modelContainer)
     }
 }

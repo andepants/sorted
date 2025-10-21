@@ -21,11 +21,14 @@ final class ConversationEntity {
     /// Conversation display name (for groups)
     var displayName: String?
 
-    /// Conversation avatar URL (for groups)
-    var avatarURL: String?
+    /// Group photo URL (for group conversations)
+    var groupPhotoURL: String?
 
     /// Is this a group conversation?
     var isGroup: Bool
+
+    /// Array of admin user IDs (for group conversations)
+    var adminUserIDs: [String]
 
     /// Creation timestamp
     var createdAt: Date
@@ -56,6 +59,17 @@ final class ConversationEntity {
     /// Last message sender ID
     var lastMessageSenderID: String?
 
+    /// Sync status for offline queue (pending, synced, failed)
+    var syncStatus: SyncStatus
+
+    // MARK: - Display Name Caching
+
+    /// Cached display name for the recipient (one-on-one conversations)
+    var recipientDisplayName: String?
+
+    /// Timestamp when display name was last fetched/updated
+    var displayNameLastUpdated: Date?
+
     // MARK: - AI Metadata
 
     /// Supermemory conversation ID for RAG context
@@ -74,18 +88,22 @@ final class ConversationEntity {
         participantIDs: [String],
         displayName: String? = nil,
         isGroup: Bool = false,
-        createdAt: Date = Date()
+        adminUserIDs: [String] = [],
+        createdAt: Date = Date(),
+        syncStatus: SyncStatus = .pending
     ) {
         self.id = id
         self.participantIDs = participantIDs
         self.displayName = displayName
         self.isGroup = isGroup
+        self.adminUserIDs = adminUserIDs
         self.createdAt = createdAt
         self.updatedAt = createdAt
         self.isPinned = false
         self.isMuted = false
         self.isArchived = false
         self.unreadCount = 0
+        self.syncStatus = syncStatus
         self.messages = []
     }
 
@@ -94,7 +112,7 @@ final class ConversationEntity {
     /// Update conversation with latest message
     func updateWithMessage(_ message: MessageEntity) {
         self.lastMessageText = message.text
-        self.lastMessageAt = message.createdAt
+        self.lastMessageAt = message.localCreatedAt
         self.lastMessageSenderID = message.senderID
         self.updatedAt = Date()
     }
@@ -111,11 +129,52 @@ final class ConversationEntity {
 
     /// Get sorted messages (newest first)
     var sortedMessages: [MessageEntity] {
-        messages.sorted { $0.createdAt > $1.createdAt }
+        messages.sorted { $0.localCreatedAt > $1.localCreatedAt }
     }
 
     /// Get messages pending sync
     var pendingSyncMessages: [MessageEntity] {
         messages.filter { $0.isPendingSync }
+    }
+
+    /// Get recipient ID (for one-on-one conversations)
+    /// - Parameter currentUserID: The current user's ID
+    /// - Returns: The recipient's user ID or "Unknown"
+    func getRecipientID(currentUserID: String) -> String {
+        // Get the participant who is NOT the current user
+        guard let recipientID = participantIDs.first(where: { $0 != currentUserID }) else {
+            return "Unknown"
+        }
+        return recipientID
+    }
+
+    /// Get display name for conversation
+    /// Uses cached recipient display name for one-on-one chats, falls back to "Unknown User"
+    /// - Parameter currentUserID: The current user's ID
+    /// - Returns: Display name or fallback
+    func getDisplayName(currentUserID: String) -> String {
+        // For one-on-one conversations, use cached recipient display name
+        if !isGroup {
+            return recipientDisplayName ?? "Unknown User"
+        }
+
+        // For group conversations, use group display name
+        return displayName ?? "Group Chat"
+    }
+
+    /// Check if display name cache needs refresh (older than 1 hour)
+    var needsDisplayNameRefresh: Bool {
+        guard let lastUpdated = displayNameLastUpdated else {
+            return true // Never fetched
+        }
+
+        let oneHourAgo = Date().addingTimeInterval(-3600)
+        return lastUpdated < oneHourAgo
+    }
+
+    /// Update cached display name
+    func updateDisplayName(_ name: String?) {
+        self.recipientDisplayName = name
+        self.displayNameLastUpdated = Date()
     }
 }

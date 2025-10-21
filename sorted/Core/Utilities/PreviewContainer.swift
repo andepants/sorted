@@ -23,10 +23,12 @@ class PreviewContainer {
             isStoredInMemoryOnly: true // In-memory only for previews
         )
 
-        let container = try! ModelContainer(
+        guard let container = try? ModelContainer(
             for: schema,
             configurations: [configuration]
-        )
+        ) else {
+            fatalError("Failed to create preview ModelContainer")
+        }
 
         // Insert sample data
         let context = container.mainContext

@@ -75,6 +75,13 @@ Sorted/
 - Test on physical devices for Firebase/push notifications
 - Follow 7-day sprint timeline: prioritize MVP features, iterate rapidly
 
+## Development & Debugging Workflow
+
+- **Always rebuild ALL running simulators** when making changes that require a rebuild
+- Use parallel `build_run_sim` calls to rebuild multiple simulators simultaneously
+- **MCP tools available:** Use XcodeBuildMCP tools for building, running, and log capture
+- After code changes, verify in all active simulator instances before proceeding
+
 # BMAD Agent System
 
 This project uses BMAD agents. When I reference an agent:

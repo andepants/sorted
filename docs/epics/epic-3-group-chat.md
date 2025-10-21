@@ -8,6 +8,26 @@
 
 ---
 
+## ✅ CODEBASE READINESS (Updated: 2025-10-21)
+
+**All prerequisite fixes have been applied to the codebase:**
+- ✅ `ConversationEntity` extended with `adminUserIDs: [String]` and `groupPhotoURL`
+- ✅ `MessageEntity` extended with `isSystemMessage: Bool` and `readBy: [String: Date]`
+- ✅ RTDB rules updated with group validation (admin permissions, participant limits, system messages)
+- ✅ `ConversationService.syncConversation()` syncs all group fields to RTDB
+- ✅ Storage rules added for `/group_photos/{groupId}/` path
+- ✅ `StorageService.uploadGroupPhoto()` method added for group photo uploads
+
+**Security Enhancements:**
+- ✅ Only admins can modify `groupName`, `groupPhotoURL`, and `participantList` (enforced by RTDB rules)
+- ✅ Participant limits enforced: min 2, max 256 (RTDB validation)
+- ✅ System messages validated: `senderID` must be "system" if `isSystemMessage == true`
+- ✅ Read receipts support timestamps: `readBy: { "userID": timestamp }`
+
+**Implementation Ready:** This epic is now ready for Story 3.1 implementation.
+
+---
+
 ## Overview
 
 Extend the one-on-one messaging infrastructure to support group conversations with multiple participants. Includes group creation, participant management, group info editing, and optimized message delivery for multi-user scenarios.
@@ -45,7 +65,9 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
 ### Data Flow Architecture (CRITICAL)
 
-**Epic 3 uses Firebase Realtime Database (RTDB) for all real-time group chat features, consistent with Epic 2.**
+**✅ VERIFIED: Epic 3 uses Firebase Realtime Database (RTDB) for all real-time group chat features, consistent with Epic 2 implementation.**
+
+**Note:** The actual codebase implements Epic 2 with RTDB (not Firestore), so Epic 3 properly extends this architecture. All models, services, and security rules have been updated to support group chat features.
 
 #### Local Persistence (SwiftData)
 
@@ -178,8 +200,8 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        @Attribute(.unique) var id: String
        var participantIDs: [String] // Multiple participants for groups
        var isGroup: Bool // true for groups, false for 1:1
-       var groupName: String? // nil for 1:1 chats
-       var groupPhotoURL: String?
+       var displayName: String? // Group name (nil for 1:1 chats)
+       var groupPhotoURL: String? // Group photo URL
        var adminUserIDs: [String] // Admins who can edit group
        var lastMessage: String?
        var lastMessageTimestamp: Date
@@ -193,7 +215,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
            id: String,
            participantIDs: [String],
            isGroup: Bool = false,
-           groupName: String? = nil,
+           displayName: String? = nil,
            groupPhotoURL: String? = nil,
            adminUserIDs: [String] = [],
            lastMessage: String? = nil,
@@ -207,7 +229,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
            self.id = id
            self.participantIDs = participantIDs
            self.isGroup = isGroup
-           self.groupName = groupName
+           self.displayName = displayName
            self.groupPhotoURL = groupPhotoURL
            self.adminUserIDs = adminUserIDs
            self.lastMessage = lastMessage
@@ -303,7 +325,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                id: UUID().uuidString,
                participantIDs: participantIDs,
                isGroup: true,
-               groupName: groupName,
+               displayName: groupName,
                adminUserIDs: [AuthService.shared.currentUserID]
            )
 
@@ -417,7 +439,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                        .clipShape(Circle())
 
                        // Group name
-                       Text(conversation.groupName ?? "Unnamed Group")
+                       Text(conversation.displayName ?? "Unnamed Group")
                            .font(.system(size: 22, weight: .bold))
 
                        Text("\(conversation.participantIDs.count) participants")
@@ -781,7 +803,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
        init(conversation: ConversationEntity) {
            self.conversation = conversation
-           _groupName = State(initialValue: conversation.groupName ?? "")
+           _groupName = State(initialValue: conversation.displayName ?? "")
        }
 
        var body: some View {
@@ -854,10 +876,10 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        }
 
        private func saveChanges() async {
-           let oldName = conversation.groupName
+           let oldName = conversation.displayName
 
            // Update group name
-           conversation.groupName = groupName
+           conversation.displayName = groupName
            conversation.updatedAt = Date()
            try? modelContext.save()
 
@@ -973,6 +995,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
    @Model
    final class MessageEntity {
        // ... existing properties ...
+       var isSystemMessage: Bool = false // true for "Alice joined", etc.
        var readBy: [String: Date] = [:] // userID -> readAt timestamp
    }
    ```

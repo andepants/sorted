@@ -45,8 +45,8 @@ service cloud.firestore {
 
     // DisplayNames collection (for uniqueness tracking)
     match /displayNames/{displayName} {
-      // Anyone authenticated can read to check availability
-      allow read: if isAuthenticated();
+      // Allow unauthenticated reads to check availability during signup
+      allow read: if true;
 
       // Only create if authenticated and claiming for yourself
       allow create: if isAuthenticated()
