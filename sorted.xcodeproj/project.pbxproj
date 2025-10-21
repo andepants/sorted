@@ -37,7 +37,7 @@
 
 /* Begin PBXFileReference section */
 		651FEB092EA6B03B0083C147 /* sorted.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = sorted.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		651FEB182EA6B03D0083C147 /* unitTest.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = unitTest.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		651FEB182EA6B03D0083C147 /* sortedTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = sortedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		651FEB222EA6B03D0083C147 /* sortedUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = sortedUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -115,7 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				651FEB092EA6B03B0083C147 /* sorted.app */,
-				651FEB182EA6B03D0083C147 /* unitTest.xctest */,
+				651FEB182EA6B03D0083C147 /* sortedTests.xctest */,
 				651FEB222EA6B03D0083C147 /* sortedUITests.xctest */,
 			);
 			name = Products;
@@ -155,9 +155,9 @@
 			productReference = 651FEB092EA6B03B0083C147 /* sorted.app */;
 			productType = "com.apple.product-type.application";
 		};
-		651FEB172EA6B03D0083C147 /* unitTest */ = {
+		651FEB172EA6B03D0083C147 /* sortedTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 651FEB2F2EA6B03D0083C147 /* Build configuration list for PBXNativeTarget "unitTest" */;
+			buildConfigurationList = 651FEB2F2EA6B03D0083C147 /* Build configuration list for PBXNativeTarget "sortedTests" */;
 			buildPhases = (
 				651FEB142EA6B03D0083C147 /* Sources */,
 				651FEB152EA6B03D0083C147 /* Frameworks */,
@@ -171,11 +171,11 @@
 			fileSystemSynchronizedGroups = (
 				651FEB1B2EA6B03D0083C147 /* sortedTests */,
 			);
-			name = unitTest;
+			name = sortedTests;
 			packageProductDependencies = (
 			);
 			productName = sortedTests;
-			productReference = 651FEB182EA6B03D0083C147 /* unitTest.xctest */;
+			productReference = 651FEB182EA6B03D0083C147 /* sortedTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		651FEB212EA6B03D0083C147 /* sortedUITests */ = {
@@ -243,7 +243,7 @@
 			projectRoot = "";
 			targets = (
 				651FEB082EA6B03B0083C147 /* sorted */,
-				651FEB172EA6B03D0083C147 /* unitTest */,
+				651FEB172EA6B03D0083C147 /* sortedTests */,
 				651FEB212EA6B03D0083C147 /* sortedUITests */,
 			);
 		};
@@ -615,7 +615,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		651FEB2F2EA6B03D0083C147 /* Build configuration list for PBXNativeTarget "unitTest" */ = {
+		651FEB2F2EA6B03D0083C147 /* Build configuration list for PBXNativeTarget "sortedTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				651FEB302EA6B03D0083C147 /* Debug */,

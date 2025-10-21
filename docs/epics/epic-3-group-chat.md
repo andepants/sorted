@@ -192,6 +192,117 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Group photo upload failure shows error toast with retry button
 - [ ] Deep link support: tapping notification opens group MessageThreadView
 
+---
+
+## Prerequisite Components
+
+**These components must be created BEFORE implementing the main story tasks:**
+
+### Component 1: ImagePicker
+
+**File:** `sorted/Core/Components/ImagePicker.swift`
+
+**Purpose:** Reusable UIImagePickerController wrapper for SwiftUI
+
+**Requirements:**
+- Presents UIImagePickerController for photo library access
+- Returns selected UIImage via SwiftUI binding
+- Handles permission requests (NSPhotoLibraryUsageDescription)
+- Supports dismiss action
+- iOS 17+ compatible
+
+**Interface:**
+```swift
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Environment(\.dismiss) private var dismiss
+
+    // UIViewControllerRepresentable implementation
+}
+```
+
+**Usage:**
+```swift
+.sheet(isPresented: $showImagePicker) {
+    ImagePicker(image: $selectedImage)
+}
+```
+
+**Estimated Time:** 15 minutes
+
+**Acceptance Criteria:**
+- [ ] Presents photo library picker
+- [ ] Returns selected image via binding
+- [ ] Handles "Cancel" action (dismisses without selection)
+- [ ] Handles permission denied gracefully
+- [ ] Compiles without warnings
+
+---
+
+### Component 2: ParticipantPickerView
+
+**File:** `sorted/Features/Chat/Views/Components/ParticipantPickerView.swift`
+
+**Purpose:** Multi-select user picker for group participant selection
+
+**Requirements:**
+- Fetches all users from Firestore `/users` collection
+- Displays users in List with profile pictures and display names
+- Multi-select with checkmark indicators
+- Filters out current user (can't add yourself)
+- Returns Set<String> of selected user IDs via binding
+- Search/filter capability (optional for MVP)
+
+**Interface:**
+```swift
+struct ParticipantPickerView: View {
+    @Binding var selectedUserIDs: Set<String>
+
+    @State private var users: [UserEntity] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        // Implementation
+    }
+}
+```
+
+**Data Source:**
+- Fetch from Firestore: `Firestore.firestore().collection("users").getDocuments()`
+- Convert to `UserEntity` objects
+- Filter out `AuthService.shared.currentUserID`
+
+**UI Design:**
+```
+┌─────────────────────────────────┐
+│ [Profile Pic] Alice Smith     ✓ │ ← Selected
+│ [Profile Pic] Bob Jones       ○ │ ← Not selected
+│ [Profile Pic] Charlie Lee     ✓ │ ← Selected
+└─────────────────────────────────┘
+```
+
+**Estimated Time:** 30 minutes
+
+**Acceptance Criteria:**
+- [ ] Loads all users from Firestore
+- [ ] Displays profile pictures (AsyncImage with fallback)
+- [ ] Multi-select with checkmark toggle
+- [ ] Current user filtered out
+- [ ] Loading state shown while fetching
+- [ ] Empty state if no users found
+- [ ] Selected user IDs returned via binding
+
+---
+
+**Total Prerequisite Time:** 45 minutes
+
+**Implementation Order:**
+1. Create ImagePicker (15 min)
+2. Create ParticipantPickerView (30 min)
+3. Proceed with Story 3.1 main tasks
+
+---
+
 **Technical Tasks:**
 1. Update ConversationEntity to support group metadata:
    ```swift
@@ -242,6 +353,21 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        }
    }
    ```
+
+---
+
+⚠️ **IMPORTANT: Proposed Implementation**
+
+The code examples below are **PROPOSED implementations** for reference only.
+These views DO NOT currently exist in the codebase. Developers should use
+these as architectural guides, not as existing code to modify.
+
+**Views to be created in this story:**
+- `GroupCreationView` (lines 253-381)
+- `ParticipantPickerView` (Task #3, see prerequisite components section)
+- `ImagePicker` (prerequisite component, see below)
+
+---
 
 2. Create GroupCreationView:
    ```swift
@@ -353,11 +479,15 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                try? await ConversationService.shared.syncConversationToRTDB(conversation)
 
                // Send system message to RTDB
+               let currentUserDisplayName = try await ConversationService.shared.fetchDisplayName(
+                   for: AuthService.shared.currentUserID ?? ""
+               ) ?? "Someone"
+
                let systemMessage = MessageEntity(
                    id: UUID().uuidString,
                    conversationID: conversation.id,
                    senderID: "system",
-                   text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") created the group",
+                   text: "\(currentUserDisplayName) created the group",
                    createdAt: Date(),
                    status: .sent,
                    syncStatus: .synced,
@@ -404,6 +534,20 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Last admin cannot leave without transferring admin rights first
 - [ ] "Leave Group" shows admin transfer dialog if user is last admin
 - [ ] If last admin force-leaves, oldest member automatically becomes admin
+
+---
+
+⚠️ **IMPORTANT: Proposed Implementation**
+
+The `GroupInfoView` implementation shown below is a **PROPOSED
+implementation** for reference. This view does NOT currently exist in the codebase.
+
+**Views to be created in this story:**
+- `GroupInfoView` (lines 434-641)
+- `EditGroupInfoView` (Task #2, referenced in Story 3.4)
+- `AddParticipantsView` (Task #3, detailed in Story 3.3)
+
+---
 
 **Technical Tasks:**
 1. Create GroupInfoView:
@@ -553,11 +697,15 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                try? await ConversationService.shared.syncConversationToRTDB(conversation)
 
                // Send system message
+               let currentUserDisplayName = try await ConversationService.shared.fetchDisplayName(
+                   for: AuthService.shared.currentUserID ?? ""
+               ) ?? "Someone"
+
                let systemMessage = MessageEntity(
                    id: UUID().uuidString,
                    conversationID: conversation.id,
                    senderID: "system",
-                   text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") removed \(participant.displayName)",
+                   text: "\(currentUserDisplayName) removed \(participant.displayName)",
                    createdAt: Date(),
                    status: .sent,
                    syncStatus: .synced,
@@ -635,6 +783,15 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Typing indicators cleaned up when participant removed
 - [ ] App badge count includes unread group messages
 - [ ] Offline participant add/remove queued for sync when online
+
+---
+
+⚠️ **IMPORTANT: Proposed Implementation**
+
+The `AddParticipantsView` implementation shown below is a
+**PROPOSED implementation** for reference. This view does NOT currently exist.
+
+---
 
 **Technical Tasks:**
 1. Create AddParticipantsView:
@@ -722,6 +879,10 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                try? await ConversationService.shared.syncConversationToRTDB(conversation)
 
                // Send batched system message
+               let currentUserDisplayName = try await ConversationService.shared.fetchDisplayName(
+                   for: AuthService.shared.currentUserID ?? ""
+               ) ?? "Someone"
+
                let addedCount = selectedUserIDs.count
                let systemMessageText: String
 
@@ -729,9 +890,9 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                    // Fetch added user's display name
                    let addedUserID = selectedUserIDs.first!
                    let addedUserName = await fetchDisplayName(for: addedUserID) ?? "Someone"
-                   systemMessageText = "\(AuthService.shared.currentUser?.displayName ?? "Someone") added \(addedUserName)"
+                   systemMessageText = "\(currentUserDisplayName) added \(addedUserName)"
                } else {
-                   systemMessageText = "\(AuthService.shared.currentUser?.displayName ?? "Someone") added \(addedCount) participants"
+                   systemMessageText = "\(currentUserDisplayName) added \(addedCount) participants"
                }
 
                let systemMessage = MessageEntity(
@@ -786,6 +947,15 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Group photo upload shows progress bar (0-100%) with cancel option
 - [ ] Large photos (>5MB) compressed before upload
 - [ ] Upload failure shows specific error (network, quota, etc.) with retry button
+
+---
+
+⚠️ **IMPORTANT: Proposed Implementation**
+
+The `EditGroupInfoView` implementation shown below is a **PROPOSED
+implementation** for reference. This view does NOT currently exist.
+
+---
 
 **Technical Tasks:**
 1. Create EditGroupInfoView:
@@ -907,11 +1077,15 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
                // Post system message if name changed
                if oldName != groupName {
+                   let currentUserDisplayName = try await ConversationService.shared.fetchDisplayName(
+                       for: AuthService.shared.currentUserID ?? ""
+                   ) ?? "Someone"
+
                    let systemMessage = MessageEntity(
                        id: UUID().uuidString,
                        conversationID: conversation.id,
                        senderID: "system",
-                       text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") changed the group name to \"\(groupName)\"",
+                       text: "\(currentUserDisplayName) changed the group name to \"\(groupName)\"",
                        createdAt: Date(),
                        status: .sent,
                        syncStatus: .synced,
@@ -945,6 +1119,15 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Shows "Alice, Bob, and 2 others are typing..." for 4+ typers
 - [ ] Typing indicator disappears after 3 seconds of inactivity
 - [ ] Only shows for active conversation (not in conversation list)
+
+---
+
+⚠️ **IMPORTANT: Proposed Implementation**
+
+The `formatTypingText()` method shown below does NOT currently exist in
+`TypingIndicatorService.swift`. This is a new extension method to be implemented.
+
+---
 
 **Technical Tasks:**
 1. Update TypingIndicatorService to handle multiple users:

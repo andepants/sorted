@@ -114,48 +114,123 @@ struct LoginView: View {
 
                     #if DEBUG
                     // Dev tools for easier testing
-                    VStack(spacing: 12) {
+                    VStack(spacing: 8) {
                         Divider()
                             .padding(.vertical, 8)
 
-                        Text("🔧 Dev Tools")
+                        Text("🔧 Dev Tools - Quick Login")
                             .font(.caption2)
                             .foregroundColor(.orange)
 
-                        HStack(spacing: 12) {
-                            // Auto-fill button
+                        // Account 1: Alice
+                        HStack(spacing: 8) {
                             Button(
                                 action: {
-                                    viewModel.email = "test@example.com"
-                                    viewModel.password = "password123"
+                                    viewModel.email = "alice@test.com"
+                                    viewModel.password = "testpass123"
                                 },
                                 label: {
-                                    Label("Fill Test Creds", systemImage: "text.insert")
-                                        .font(.caption)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 12)
-                                        .background(Color.orange.opacity(0.2))
-                                        .foregroundColor(.orange)
-                                        .cornerRadius(8)
+                                    Label("Fill Alice", systemImage: "person.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.purple.opacity(0.2))
+                                        .foregroundColor(.purple)
+                                        .cornerRadius(6)
                                 }
                             )
 
-                            // Auto-login button
                             Button(
                                 action: {
-                                    viewModel.email = "test@example.com"
-                                    viewModel.password = "password123"
+                                    viewModel.email = "alice@test.com"
+                                    viewModel.password = "testpass123"
                                     focusedField = nil
                                     Task { await viewModel.login() }
                                 },
                                 label: {
-                                    Label("Quick Login", systemImage: "bolt.fill")
-                                        .font(.caption)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 12)
+                                    Label("Login Alice", systemImage: "bolt.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
                                         .background(Color.green.opacity(0.2))
                                         .foregroundColor(.green)
-                                        .cornerRadius(8)
+                                        .cornerRadius(6)
+                                }
+                            )
+                            .disabled(viewModel.isLoading)
+                        }
+
+                        // Account 2: Bob
+                        HStack(spacing: 8) {
+                            Button(
+                                action: {
+                                    viewModel.email = "bob@test.com"
+                                    viewModel.password = "testpass123"
+                                },
+                                label: {
+                                    Label("Fill Bob", systemImage: "person.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.blue.opacity(0.2))
+                                        .foregroundColor(.blue)
+                                        .cornerRadius(6)
+                                }
+                            )
+
+                            Button(
+                                action: {
+                                    viewModel.email = "bob@test.com"
+                                    viewModel.password = "testpass123"
+                                    focusedField = nil
+                                    Task { await viewModel.login() }
+                                },
+                                label: {
+                                    Label("Login Bob", systemImage: "bolt.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.green.opacity(0.2))
+                                        .foregroundColor(.green)
+                                        .cornerRadius(6)
+                                }
+                            )
+                            .disabled(viewModel.isLoading)
+                        }
+
+                        // Account 3: Carol
+                        HStack(spacing: 8) {
+                            Button(
+                                action: {
+                                    viewModel.email = "carol@test.com"
+                                    viewModel.password = "testpass123"
+                                },
+                                label: {
+                                    Label("Fill Carol", systemImage: "person.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.pink.opacity(0.2))
+                                        .foregroundColor(.pink)
+                                        .cornerRadius(6)
+                                }
+                            )
+
+                            Button(
+                                action: {
+                                    viewModel.email = "carol@test.com"
+                                    viewModel.password = "testpass123"
+                                    focusedField = nil
+                                    Task { await viewModel.login() }
+                                },
+                                label: {
+                                    Label("Login Carol", systemImage: "bolt.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.green.opacity(0.2))
+                                        .foregroundColor(.green)
+                                        .cornerRadius(6)
                                 }
                             )
                             .disabled(viewModel.isLoading)

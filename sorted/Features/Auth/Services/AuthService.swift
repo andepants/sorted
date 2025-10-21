@@ -8,6 +8,10 @@ import FirebaseFirestore
 import Foundation
 import Kingfisher
 
+// Disambiguate between FirebaseAuth.User and our custom User struct
+typealias AppUser = User
+typealias FirebaseUser = FirebaseAuth.User
+
 /// Service responsible for all authentication operations
 final class AuthService {
     /// Shared singleton instance

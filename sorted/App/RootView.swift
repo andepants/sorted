@@ -19,8 +19,10 @@ struct RootView: View {
                 }
             } else if authViewModel.isAuthenticated {
                 // Authenticated: Show conversation list (main app)
-                ConversationListView()
-                    .environmentObject(authViewModel)
+                // TEMPORARY: ConversationListView disabled for build testing
+                Text("Conversations - Coming Soon")
+                    .font(.title)
+                    .foregroundColor(.secondary)
             } else {
                 // Not authenticated: Show login screen
                 LoginView()

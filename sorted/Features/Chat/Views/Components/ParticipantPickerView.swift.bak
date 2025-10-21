@@ -1,0 +1,220 @@
+/// ParticipantPickerView.swift
+///
+/// Multi-select user picker for group participant selection
+/// Fetches users from Firestore and allows multi-selection
+///
+/// Created: 2025-10-21 (Epic 3 Prerequisite)
+
+@preconcurrency import FirebaseFirestore
+import SwiftUI
+
+/// Multi-select participant picker for group creation
+struct ParticipantPickerView: View {
+    /// Binding to store selected user IDs
+    @Binding var selectedUserIDs: Set<String>
+
+    // MARK: - State
+
+    @State private var users: [UserPreview] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var searchText = ""
+
+    // MARK: - Body
+
+    var body: some View {
+        List {
+            if isLoading {
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView("Loading users...")
+                        Spacer()
+                    }
+                }
+            } else if let error = errorMessage {
+                Section {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .foregroundColor(.red)
+                }
+            } else if filteredUsers.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        "No Users Found",
+                        systemImage: "person.slash",
+                        description: Text("No users available to add to group")
+                    )
+                }
+            } else {
+                Section {
+                    ForEach(filteredUsers) { user in
+                        ParticipantRow(
+                            user: user,
+                            isSelected: selectedUserIDs.contains(user.id)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            toggleSelection(for: user.id)
+                        }
+                    }
+                }
+            }
+        }
+        .searchable(text: $searchText, prompt: "Search users")
+        .task {
+            await loadUsers()
+        }
+    }
+
+    // MARK: - Filtered Users
+
+    private var filteredUsers: [UserPreview] {
+        if searchText.isEmpty {
+            return users
+        } else {
+            return users.filter { user in
+                user.displayName.localizedCaseInsensitiveContains(searchText) ||
+                user.email.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+    }
+
+    // MARK: - Methods
+
+    /// Toggle user selection
+    private func toggleSelection(for userID: String) {
+        if selectedUserIDs.contains(userID) {
+            selectedUserIDs.remove(userID)
+        } else {
+            selectedUserIDs.insert(userID)
+        }
+    }
+
+    /// Load users from Firestore
+    private func loadUsers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let firestore = Firestore.firestore()
+            let snapshot = try await firestore.collection("users").getDocuments()
+
+            // Get current user ID to filter out
+            let currentUserID = AuthService.shared.currentUserID ?? ""
+
+            // Convert documents to UserPreview objects
+            let fetchedUsers = snapshot.documents.compactMap { doc -> UserPreview? in
+                guard let data = doc.data() as? [String: Any],
+                      let email = data["email"] as? String,
+                      let displayName = data["displayName"] as? String,
+                      doc.documentID != currentUserID else {
+                    return nil
+                }
+
+                return UserPreview(
+                    id: doc.documentID,
+                    email: email,
+                    displayName: displayName,
+                    photoURL: data["photoURL"] as? String
+                )
+            }
+
+            // Sort alphabetically by display name
+            users = fetchedUsers.sorted { $0.displayName < $1.displayName }
+
+        } catch {
+            errorMessage = "Failed to load users: \(error.localizedDescription)"
+        }
+
+        isLoading = false
+    }
+}
+
+// MARK: - ParticipantRow
+
+/// Row view for a single participant
+private struct ParticipantRow: View {
+    let user: UserPreview
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Profile picture
+            AsyncImage(url: URL(string: user.photoURL ?? "")) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            } placeholder: {
+                Circle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay {
+                        Text(user.displayName.prefix(1).uppercased())
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(Circle())
+
+            // User info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(user.displayName)
+                    .font(.system(size: 16, weight: .medium))
+
+                Text(user.email)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // Checkmark
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.blue)
+                    .font(.system(size: 24))
+            } else {
+                Image(systemName: "circle")
+                    .foregroundColor(.gray)
+                    .font(.system(size: 24))
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - UserPreview Model
+
+/// Lightweight user model for participant selection
+struct UserPreview: Identifiable {
+    let id: String
+    let email: String
+    let displayName: String
+    let photoURL: String?
+}
+
+// MARK: - Preview
+
+#Preview {
+    NavigationStack {
+        struct ParticipantPickerPreview: View {
+            @State private var selectedUserIDs: Set<String> = []
+
+            var body: some View {
+                VStack {
+                    ParticipantPickerView(selectedUserIDs: $selectedUserIDs)
+
+                    if !selectedUserIDs.isEmpty {
+                        Text("Selected: \(selectedUserIDs.count) users")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding()
+                    }
+                }
+            }
+        }
+
+        return ParticipantPickerPreview()
+            .navigationTitle("Select Participants")
+    }
+}
