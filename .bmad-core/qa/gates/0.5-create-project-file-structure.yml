@@ -1,0 +1,20 @@
+schema: 1
+story: '0.5'
+gate: CONCERNS
+status_reason: 'Empty folders missing .gitkeep files as specified; Features/Chat/Views and Features/AI/Views parent folders appear empty.'
+reviewer: 'QA Agent'
+updated: '2025-10-20T17:15:00Z'
+top_issues:
+  - id: 'REQ-001'
+    severity: medium
+    finding: 'Empty folders do not contain .gitkeep files or placeholder files'
+    suggested_action: 'Add .gitkeep files to all empty folders to ensure git tracking'
+  - id: 'REQ-002'
+    severity: low
+    finding: 'Features/Chat/Views and Features/AI/Views parent folders are empty (only have Components subfolder)'
+    suggested_action: 'Add .gitkeep to parent Views folders or clarify this is intentional'
+  - id: 'ARCH-001'
+    severity: low
+    finding: 'Folder depth is 4 levels (Features/Chat/Views/Components) which exceeds stated maximum of 3'
+    suggested_action: 'Verify if 3-level depth is from sorted/ root (currently 4 from sorted/) or from project root (currently 5 total)'
+waiver: { active: false }

@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isValidSize() {
+      // Max 5MB for profile pictures
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Profile pictures
+    match /profile_pictures/{userId}/{fileName} {
+      // Anyone can read profile pictures
+      allow read: if true;
+
+      // Only the user can upload their own profile picture
+      allow write: if isAuthenticated()
+        && isOwner(userId)
+        && isImage()
+        && isValidSize();
+
+      // Only the user can delete their own profile picture
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Group photos
+    match /group_photos/{groupId}/{fileName} {
+      // Anyone can read group photos
+      allow read: if true;
+
+      // Any authenticated user can upload group photos
+      // Note: Admin validation happens in app before upload (Storage rules can't access RTDB)
+      allow write: if isAuthenticated()
+        && isImage()
+        && isValidSize();
+
+      // Any authenticated user can delete group photos
+      // Note: Admin validation happens in app before deletion
+      allow delete: if isAuthenticated();
+    }
+
+    // Conversation media (for future use)
+    match /conversation_media/{conversationId}/{messageId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+        && isImage()
+        && isValidSize();
+    }
+
+    // Block all other storage access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

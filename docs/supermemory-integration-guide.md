@@ -1,4 +1,4 @@
-# Supermemory Integration Guide - MessageAI
+# Supermemory Integration Guide - Sorted
 
 **Version:** 1.0
 **Last Updated:** October 20, 2025
@@ -22,14 +22,14 @@
 
 ### 1.1 What is Supermemory?
 
-Supermemory is a universal memory API that provides long-term conversation storage and RAG (Retrieval-Augmented Generation) capabilities. It enables MessageAI to:
+Supermemory is a universal memory API that provides long-term conversation storage and RAG (Retrieval-Augmented Generation) capabilities. It enables Sorted to:
 
 - **Store** all conversation history for long-term memory
 - **Retrieve** relevant context when drafting AI responses
 - **Search** past conversations using semantic similarity
 - **Personalize** AI responses based on creator's communication patterns
 
-### 1.2 Why Supermemory for MessageAI?
+### 1.2 Why Supermemory for Sorted?
 
 | Feature | Without Supermemory | With Supermemory |
 |---------|-------------------|------------------|
@@ -175,7 +175,7 @@ actor SupermemoryService {
         let payload: [String: Any] = [
             "content": content,
             "metadata": metadata ?? [:],
-            "containerTags": ["messageai", "conversations"]
+            "containerTags": ["sorted", "conversations"]
         ]
 
         let jsonData = try JSONSerialization.data(withJSONObject: payload)
@@ -221,7 +221,7 @@ enum SupermemoryError: Error {
     "sentiment": "positive",
     "timestamp": "2025-10-20T12:00:00Z"
   },
-  "containerTags": ["user-creator-id", "messageai", "conversations"]
+  "containerTags": ["user-creator-id", "sorted", "conversations"]
 }
 ```
 
@@ -270,12 +270,12 @@ exports.storeMessageToSupermemory = functions.firestore
           category: message.metadata?.category || 'uncategorized',
           sentiment: message.metadata?.sentiment?.type || 'neutral',
           timestamp: message.createdAt.toDate().toISOString(),
-          platform: 'messageai'
+          platform: 'sorted'
         },
         containerTags: [
           message.senderID, // Tag with sender for user-specific queries
           conversationID,   // Tag with conversation for thread queries
-          'messageai'       // Platform tag
+          'sorted'       // Platform tag
         ]
       };
 
@@ -386,7 +386,7 @@ exports.batchStoreConversation = functions.https.onCall(async (data, context) =>
             senderID: message.senderID,
             timestamp: message.createdAt.toDate().toISOString()
           },
-          containerTags: [message.senderID, conversationID, 'messageai']
+          containerTags: [message.senderID, conversationID, 'sorted']
         };
 
         return await supermemoryClient.post('/documents', supermemoryDoc);
@@ -464,7 +464,7 @@ async function querySupermemoryContext(conversationID, query, limit = 5) {
   try {
     const response = await supermemoryClient.post('/search', {
       query: query,
-      containerTags: [conversationID, 'messageai'],
+      containerTags: [conversationID, 'sorted'],
       limit: limit
     });
 
@@ -687,7 +687,7 @@ exports.summarizeConversation = functions.https.onCall(async (data, context) => 
     // Query ALL memories for this conversation
     const response = await supermemoryClient.post('/search', {
       query: 'Summarize the entire conversation',
-      containerTags: [conversationID, 'messageai'],
+      containerTags: [conversationID, 'sorted'],
       limit: 50 // Get more context for summary
     });
 
@@ -956,7 +956,7 @@ async function generateSmartReplyWithFallback(conversationID, incomingMessage, c
     // Try Supermemory first
     contextMemories = await SupermemoryService.search(
       `Context for: ${incomingMessage}`,
-      [conversationID, 'messageai'],
+      [conversationID, 'sorted'],
       5
     );
     contextSource = 'supermemory';
@@ -1059,7 +1059,7 @@ exports.storeMessageToSupermemory = functions.firestore
           senderID: message.senderID,
           timestamp: message.createdAt.toDate().toISOString()
         },
-        containerTags: [message.senderID, conversationID, 'messageai']
+        containerTags: [message.senderID, conversationID, 'sorted']
       };
 
       const response = await retryWithBackoff(async () => {
@@ -1093,7 +1093,7 @@ exports.generateSmartReply = functions.https.onCall(async (data, context) => {
     const searchResults = await retryWithBackoff(async () => {
       return await supermemoryClient.post('/search', {
         query: `Context for: ${incomingMessage}`,
-        containerTags: [conversationID, 'messageai'],
+        containerTags: [conversationID, 'sorted'],
         limit: 5
       });
     });
@@ -1171,7 +1171,7 @@ exports.batchStoreConversation = functions.https.onCall(async (data, context) =>
           customId: message.id,
           content: `${message.senderID}: ${message.text}`,
           metadata: { conversationID },
-          containerTags: [conversationID, 'messageai']
+          containerTags: [conversationID, 'sorted']
         });
       });
     })
@@ -1356,7 +1356,7 @@ exports.deleteUserSupermemoryData = functions.auth.user().onDelete(async (user) 
 
 ## Summary
 
-This guide provides complete Supermemory integration for MessageAI:
+This guide provides complete Supermemory integration for Sorted:
 
 ✅ **Authentication**: Bearer token auth, Cloud Functions configuration
 ✅ **Storing Conversations**: Automatic storage on message creation, batch storage

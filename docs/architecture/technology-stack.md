@@ -17,13 +17,16 @@ Min iOS Version:    iOS 17.0
 
 ```
 Authentication:     Firebase Auth
-Database:           Cloud Firestore (Real-time NoSQL)
+Database:           Cloud Firestore (User profiles, static data)
+Real-time Database: Firebase Realtime Database (Chat, typing indicators, presence)
 Push Notifications: Firebase Cloud Messaging (FCM)
 Storage:            Firebase Storage (Media files)
 Serverless:         Cloud Functions (Node.js 18)
 Analytics:          Firebase Analytics
 Crash Reporting:    Firebase Crashlytics
 ```
+
+**Important:** Use Realtime Database for ALL real-time features (chat messages, typing indicators, user presence). Use Firestore for static/profile data only.
 
 ### 2.3 AI Services
 

@@ -6,9 +6,9 @@
 
 | Environment | Purpose | Firebase Project | TestFlight | Users |
 |-------------|---------|------------------|------------|-------|
-| **Development** | Local dev | messageai-dev | No | Developers |
-| **Staging** | Internal testing | messageai-staging | Internal | Team |
-| **Production** | Live app | messageai-prod | External → App Store | End users |
+| **Development** | Local dev | sorted-dev | No | Developers |
+| **Staging** | Internal testing | sorted-staging | Internal | Team |
+| **Production** | Live app | sorted-prod | External → App Store | End users |
 
 **Development:**
 - Firebase emulators for Auth, Firestore, Functions
@@ -30,14 +30,14 @@
 ### 9.2 Build Configurations
 
 **Xcode Schemes:**
-- MessageAI-Dev (Debug build, emulators)
-- MessageAI-Staging (Release build, staging Firebase)
-- MessageAI-Production (Release build, production Firebase)
+- Sorted-Dev (Debug build, emulators)
+- Sorted-Staging (Release build, staging Firebase)
+- Sorted-Production (Release build, production Firebase)
 
 **Bundle IDs:**
-- Development: `com.messageai.app.dev`
-- Staging: `com.messageai.app.staging`
-- Production: `com.messageai.app`
+- Development: `com.sorted.app.dev`
+- Staging: `com.sorted.app.staging`
+- Production: `com.sorted.app`
 
 ### 9.3 TestFlight Distribution
 
@@ -57,10 +57,10 @@
 
 Deploy via Firebase CLI:
 ```bash
-firebase deploy --only functions --project messageai-prod
+firebase deploy --only functions --project sorted-prod
 ```
 
 Set environment variables:
 ```bash
-firebase functions:config:set openai.api_key="sk-..." --project messageai-prod
+firebase functions:config:set openai.api_key="sk-..." --project sorted-prod
 ```

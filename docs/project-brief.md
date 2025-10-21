@@ -1,4 +1,4 @@
-# MessageAI
+# Sorted
 ## Building Cross-Platform Messaging Apps with AI Features
 
 ## Background

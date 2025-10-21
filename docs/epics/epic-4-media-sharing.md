@@ -29,6 +29,23 @@ Enable users to share images, videos, and files within conversations. Includes m
 
 ---
 
+### iOS-Specific Media Sharing Patterns
+
+**Media sharing is heavily iOS-specific - follow native iOS patterns:**
+
+- ✅ **Photo Permissions:** CRITICAL - NSPhotoLibraryUsageDescription and NSCameraUsageDescription in Info.plist
+- ✅ **PhotosPicker:** Use native `PhotosPicker` (iOS 16+) for modern photo selection
+- ✅ **Camera Integration:** Wrap `UIImagePickerController` for camera access
+- ✅ **Pinch-to-Zoom:** Use `MagnificationGesture()` for full-screen image viewer
+- ✅ **Swipe-to-Dismiss:** Interactive dismissal with drag gesture in media viewer
+- ✅ **Progress Indicators:** Circular progress for uploads (0-100%)
+- ✅ **Share Sheet:** Use native `UIActivityViewController` for sharing
+- ✅ **Photo Library Saving:** Request permission, handle denial gracefully
+- ✅ **Kingfisher Caching:** Configure cache limits for mobile (500MB disk max)
+- ✅ **Memory Management:** Release large images from memory after viewing
+
+---
+
 ## User Stories
 
 ### Story 4.1: Image Picker and Camera Integration
@@ -256,6 +273,26 @@ Enable users to share images, videos, and files within conversations. Includes m
 
 5. Request camera permission in Info.plist (already done in Epic 0)
 
+**iOS Mobile Considerations:**
+- **Photo Picker (iOS 16+):**
+  - Use `PhotosPicker` with `.photoLibrary` selection limit
+  - Multi-select up to 10 images: `maxSelectionCount: 10`
+  - Handle permission denial: Show `.alert()` with link to Settings
+- **Camera Integration:**
+  - Wrap `UIImagePickerController` with `UIViewControllerRepresentable`
+  - Check camera availability: `UIImagePickerController.isSourceTypeAvailable(.camera)`
+  - Handle camera permission denial gracefully
+- **Image Preview:**
+  - Show selected images as scrollable thumbnails (80x80pt)
+  - Tap X button to remove image before sending
+  - Use `.clipShape(RoundedRectangle(cornerRadius: 8))` for thumbnails
+- **Keyboard Interaction:**
+  - Keyboard should NOT dismiss when selecting images
+  - Show image picker as `.confirmationDialog()` first, then `.sheet()` for picker
+- **Accessibility:**
+  - Label image thumbnails with "Selected image 1 of 3, double tap to remove"
+  - Announce image selection count changes to VoiceOver
+
 **References:**
 - SwiftData Implementation Guide Section 3.4 (AttachmentEntity)
 - PRD Epic 4: Media Sharing
@@ -471,6 +508,29 @@ Enable users to share images, videos, and files within conversations. Includes m
 3. Update MessageBubbleView to show upload progress
 4. Add retry button for failed uploads
 
+**iOS Mobile Considerations:**
+- **Upload Progress:**
+  - Show circular progress indicator overlay on image thumbnail
+  - Display percentage: "47%" in center of circle
+  - Use `ProgressView(value: progress)` with `.progressViewStyle(.circular)`
+- **Image Compression:**
+  - Compress on background thread to avoid blocking main thread
+  - Show "Compressing..." state before upload starts
+  - Target: < 500KB per image for mobile data savings
+- **Parallel Uploads:**
+  - Limit to 3 concurrent uploads to avoid overwhelming device/network
+  - Use `TaskGroup` for structured concurrency
+- **Upload Cancellation:**
+  - Allow user to cancel upload mid-progress
+  - Show "Cancel" button on uploading images
+- **Error Handling:**
+  - Show red "!" badge on failed uploads
+  - Tap failed image to retry
+  - Use haptic error feedback on failure
+- **Cellular Data Warning:**
+  - Optional: Warn user if uploading large images on cellular (not Wi-Fi)
+  - Use `NWPathMonitor` to detect connection type
+
 **References:**
 - Architecture Doc Section 8.2 (Firebase Storage)
 
@@ -488,12 +548,12 @@ Enable users to share images, videos, and files within conversations. Includes m
 - [ ] Failed image loads show broken image icon
 
 **Technical Tasks:**
-1. Configure Kingfisher in MessageAIApp.swift:
+1. Configure Kingfisher in SortedApp.swift:
    ```swift
    import Kingfisher
 
    @main
-   struct MessageAIApp: App {
+   struct SortedApp: App {
        init() {
            FirebaseApp.configure()
 
@@ -759,6 +819,30 @@ Enable users to share images, videos, and files within conversations. Includes m
 2. Add gesture recognizers for zoom and pan
 3. Implement share sheet integration
 4. Implement save to Photos library (requires permission)
+
+**iOS Mobile Considerations:**
+- **Pinch-to-Zoom Gestures:**
+  - Use `MagnificationGesture()` for zoom (min 1.0x, max 4.0x)
+  - Combine with `DragGesture()` for pan when zoomed
+  - Double-tap to zoom in/out (toggle between 1x and 2x)
+- **Swipe-to-Dismiss:**
+  - Swipe down when at 1x zoom to dismiss viewer
+  - Use `.offset()` and animation for interactive dismissal
+  - Prevent dismiss when zoomed (> 1.0x)
+- **Horizontal Paging:**
+  - Use `TabView(selection:)` with `.tabViewStyle(.page)` for swiping between images
+  - Show image counter: "2 of 5" in top overlay
+- **Share Sheet:**
+  - Use `UIActivityViewController` wrapped in `UIViewControllerRepresentable`
+  - Share original image URL, not thumbnail
+- **Save to Photos:**
+  - Request photo library add permission (different from read permission!)
+  - Use `PHPhotoLibrary.shared().performChanges()` for saving
+  - Show success alert with haptic feedback
+- **Accessibility:**
+  - VoiceOver describes current image and position
+  - Zoom level announced when changed
+  - Actions (share, save) properly labeled
 
 **References:**
 - UX Design Doc Section 3.4 (Media Viewer)

@@ -25,14 +25,29 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
 
 ---
 
+### iOS-Specific Mobile Setup Notes
+
+**This is a native iOS mobile app** - ensure all scaffolding follows iOS best practices:
+
+- ✅ **Info.plist Permissions:** Camera, Photo Library, Notifications (NSCameraUsageDescription, NSPhotoLibraryUsageDescription, etc.)
+- ✅ **Build Configurations:** Development (emulators), Staging, Production with proper bundle IDs
+- ✅ **Swift 6 Strict Concurrency:** Enable `SWIFT_STRICT_CONCURRENCY = complete` for compile-time safety
+- ✅ **iOS Deployment Target:** Set to iOS 17.0 minimum (SwiftData requirement)
+- ✅ **Simulator Testing:** Test on iPhone SE (small screen), iPhone 14 Pro (Dynamic Island), iPad
+- ✅ **Keychain Entitlements:** Configure for secure token storage
+- ✅ **Background Modes:** Enable if needed for notifications, background fetch
+- ✅ **App Icons & Launch Screen:** Set up iOS-specific assets
+
+---
+
 ## User Stories
 
 ### Story 0.1: Initialize Xcode Project
 **As a developer, I need a properly configured Xcode project so I can begin iOS development immediately.**
 
 **Acceptance Criteria:**
-- [ ] New Xcode project created: "MessageAI"
-- [ ] Bundle ID: `com.messageai.app.dev`
+- [ ] New Xcode project created: "Sorted"
+- [ ] Bundle ID: `com.sorted.app.dev`
 - [ ] iOS Deployment Target: iOS 17.0
 - [ ] Language: Swift 6
 - [ ] UI Framework: SwiftUI
@@ -53,6 +68,21 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
    - Camera usage description (for profile pictures)
    - Photo library usage description
    - Notifications usage description
+
+**iOS Mobile Considerations:**
+- **Info.plist Required Keys** (add these NOW to avoid permission crashes later):
+  ```xml
+  <key>NSCameraUsageDescription</key>
+  <string>We need camera access to take profile pictures and share photos in messages.</string>
+
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>We need access to your photos to set profile pictures and share images.</string>
+
+  <key>NSUserNotificationsUsageDescription</key>
+  <string>We'll send you notifications for new messages so you never miss a conversation.</string>
+  ```
+- **Simulator vs Device Testing:** Simulator can't test camera, push notifications, or some Keychain features - plan for device testing
+- **Bundle ID Convention:** Use reverse domain notation (com.sorted.app.dev for development)
 
 ---
 
@@ -91,9 +121,9 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
 **As a developer, I need Firebase configured so I can use Auth, Firestore, Storage, and Cloud Functions.**
 
 **Acceptance Criteria:**
-- [ ] Firebase project created: `messageai-dev`
+- [ ] Firebase project created: `sorted-dev`
 - [ ] GoogleService-Info.plist downloaded and added to Xcode
-- [ ] Firebase initialized in MessageAIApp.swift
+- [ ] Firebase initialized in SortedApp.swift
 - [ ] Firestore database created (test mode initially)
 - [ ] Firebase Storage bucket created
 - [ ] Firebase Authentication enabled (Email/Password)
@@ -101,15 +131,15 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
 
 **Technical Tasks:**
 1. Create Firebase project at console.firebase.google.com
-2. Register iOS app with bundle ID: `com.messageai.app.dev`
+2. Register iOS app with bundle ID: `com.sorted.app.dev`
 3. Download `GoogleService-Info.plist`
 4. Add `GoogleService-Info.plist` to Xcode project (add to target)
-5. Initialize Firebase in `MessageAIApp.swift`:
+5. Initialize Firebase in `SortedApp.swift`:
    ```swift
    import Firebase
 
    @main
-   struct MessageAIApp: App {
+   struct SortedApp: App {
        init() {
            FirebaseApp.configure()
        }
@@ -128,7 +158,7 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
 
 **Acceptance Criteria:**
 - [ ] All 5 @Model entities defined (Message, Conversation, User, Attachment, FAQ)
-- [ ] ModelContainer configured in MessageAIApp.swift
+- [ ] ModelContainer configured in SortedApp.swift
 - [ ] Schema includes all relationships and cascade delete rules
 - [ ] Preview container available for SwiftUI previews
 - [ ] App builds and initializes SwiftData without errors
@@ -141,12 +171,12 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
    - `UserEntity.swift`
    - `AttachmentEntity.swift`
    - `FAQEntity.swift`
-3. Configure ModelContainer in `MessageAIApp.swift`:
+3. Configure ModelContainer in `SortedApp.swift`:
    ```swift
    import SwiftData
 
    @main
-   struct MessageAIApp: App {
+   struct SortedApp: App {
        let modelContainer: ModelContainer
 
        init() {
@@ -195,9 +225,9 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
 **Technical Tasks:**
 1. Create folder structure:
    ```
-   MessageAI/
+   Sorted/
    ├── App/
-   │   └── MessageAIApp.swift
+   │   └── SortedApp.swift
    ├── Features/
    │   ├── Auth/
    │   │   ├── Views/
@@ -230,8 +260,8 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
    │   ├── GoogleService-Info.plist
    │   └── Assets.xcassets/
    └── Tests/
-       ├── MessageAITests/
-       └── MessageAIUITests/
+       ├── SortedTests/
+       └── SortedUITests/
    ```
 
 2. Create placeholder .swift files with headers in each directory
@@ -388,7 +418,7 @@ SWIFT_STRICT_CONCURRENCY = complete
 
 ### ModelContainer Configuration
 
-The ModelContainer setup in `MessageAIApp.swift` should match the pattern from the SwiftData Implementation Guide (Section 5):
+The ModelContainer setup in `SortedApp.swift` should match the pattern from the SwiftData Implementation Guide (Section 5):
 
 ```swift
 import SwiftUI
@@ -396,7 +426,7 @@ import SwiftData
 import Firebase
 
 @main
-struct MessageAIApp: App {
+struct SortedApp: App {
     let modelContainer: ModelContainer
 
     init() {

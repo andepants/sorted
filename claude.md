@@ -1,4 +1,4 @@
-# MessageAI - iOS Messaging App with AI
+# Sorted - iOS Messaging App with AI
 
 You are an expert in Swift 6, SwiftUI, iOS 17+, Firebase, and real-time messaging systems.
 You have extensive experience building production-grade iOS applications for large companies.
@@ -56,7 +56,7 @@ AI-first codebase: modular, scalable, easy to understand and navigate.
 ## File Structure
 
 ```
-MessageAI/
+Sorted/
 ├── App/                  // Entry point and lifecycle
 ├── Models/               // Data models (Message, Conversation, User)
 ├── Views/                // SwiftUI views by feature (Chat/, Profile/)
@@ -74,6 +74,13 @@ MessageAI/
 - Use native Swift solutions first (no unnecessary dependencies)
 - Test on physical devices for Firebase/push notifications
 - Follow 7-day sprint timeline: prioritize MVP features, iterate rapidly
+
+## Development & Debugging Workflow
+
+- **Always rebuild ALL running simulators** when making changes that require a rebuild
+- Use parallel `build_run_sim` calls to rebuild multiple simulators simultaneously
+- **MCP tools available:** Use XcodeBuildMCP tools for building, running, and log capture
+- After code changes, verify in all active simulator instances before proceeding
 
 # BMAD Agent System
 

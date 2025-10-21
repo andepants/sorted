@@ -8,6 +8,26 @@
 
 ---
 
+## ✅ CODEBASE READINESS (Updated: 2025-10-21)
+
+**All prerequisite fixes have been applied to the codebase:**
+- ✅ `ConversationEntity` extended with `adminUserIDs: [String]` and `groupPhotoURL`
+- ✅ `MessageEntity` extended with `isSystemMessage: Bool` and `readBy: [String: Date]`
+- ✅ RTDB rules updated with group validation (admin permissions, participant limits, system messages)
+- ✅ `ConversationService.syncConversation()` syncs all group fields to RTDB
+- ✅ Storage rules added for `/group_photos/{groupId}/` path
+- ✅ `StorageService.uploadGroupPhoto()` method added for group photo uploads
+
+**Security Enhancements:**
+- ✅ Only admins can modify `groupName`, `groupPhotoURL`, and `participantList` (enforced by RTDB rules)
+- ✅ Participant limits enforced: min 2, max 256 (RTDB validation)
+- ✅ System messages validated: `senderID` must be "system" if `isSystemMessage == true`
+- ✅ Read receipts support timestamps: `readBy: { "userID": timestamp }`
+
+**Implementation Ready:** This epic is now ready for Story 3.1 implementation.
+
+---
+
 ## Overview
 
 Extend the one-on-one messaging infrastructure to support group conversations with multiple participants. Includes group creation, participant management, group info editing, and optimized message delivery for multi-user scenarios.
@@ -28,6 +48,129 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
 ---
 
+### iOS-Specific Group Messaging Patterns
+
+**Group chat extends Epic 2 with iOS mobile-first enhancements:**
+
+- ✅ **Multi-Select UI:** Native iOS participant selection with checkmarks
+- ✅ **Group Photo Picker:** Same permissions as profile photos (NSPhotoLibraryUsageDescription)
+- ✅ **Confirmation Dialogs:** Use `.confirmationDialog()` for destructive actions (leave group, remove participant)
+- ✅ **Sheet Presentations:** Use `.sheet()` for group creation, editing, participant management
+- ✅ **List Performance:** Efficient rendering of large participant lists with LazyVStack
+- ✅ **Haptic Feedback:** Haptics for participant add/remove, group name changes
+- ✅ **Accessibility:** VoiceOver announces participant count changes, admin badges
+- ✅ **Safe Areas:** All modals respect safe areas (especially on iPad)
+
+---
+
+### Data Flow Architecture (CRITICAL)
+
+**✅ VERIFIED: Epic 3 uses Firebase Realtime Database (RTDB) for all real-time group chat features, consistent with Epic 2 implementation.**
+
+**Note:** The actual codebase implements Epic 2 with RTDB (not Firestore), so Epic 3 properly extends this architecture. All models, services, and security rules have been updated to support group chat features.
+
+#### Local Persistence (SwiftData)
+
+```swift
+// Local-only models for offline access
+@Model final class ConversationEntity {
+    var id: String
+    var participantIDs: [String]
+    var isGroup: Bool
+    var groupName: String?
+    var syncStatus: SyncStatus // .pending, .synced, .failed
+    // ... other fields
+}
+
+@Model final class MessageEntity {
+    var id: String
+    var conversationID: String
+    var senderID: String
+    var text: String
+    var syncStatus: SyncStatus
+    // ... other fields
+}
+```
+
+#### Remote Real-time Database (Firebase RTDB)
+
+**Conversations:**
+```
+/conversations/{conversationID}/
+  ├── participantIDs: { "user1": true, "user2": true, "user3": true }
+  ├── isGroup: true
+  ├── groupName: "Family Group"
+  ├── groupPhotoURL: "https://storage.googleapis.com/..."
+  ├── adminUserIDs: { "user1": true }
+  ├── lastMessage: "Hey everyone!"
+  ├── lastMessageTimestamp: 1704067200000
+  ├── createdAt: 1704067100000
+  └── updatedAt: 1704067200000
+```
+
+**Messages:**
+```
+/messages/{conversationID}/{messageID}/
+  ├── senderID: "user1"
+  ├── text: "Hey everyone!"
+  ├── serverTimestamp: 1704067200000
+  ├── status: "sent"
+  ├── isSystemMessage: false
+  └── readBy/
+      ├── user2: 1704067300000
+      └── user3: 1704067400000
+```
+
+**Typing Indicators:**
+```
+/typing/{conversationID}/{userID}/
+  ├── isTyping: true
+  └── lastUpdated: { ".sv": "timestamp" }
+```
+
+#### Remote Static Database (Cloud Firestore)
+
+**User Profiles (READ-ONLY for messaging features):**
+```
+/users/{userID}/
+  ├── displayName: "Alice Smith"
+  ├── email: "alice@example.com"
+  ├── profilePictureURL: "https://..."
+  ├── fcmToken: "fE3Kd..."
+  └── updatedAt: Timestamp
+```
+
+#### Bidirectional Sync Strategy
+
+**Write Flow (User → RTDB):**
+1. User creates/edits group → Save to SwiftData with `syncStatus: .pending`
+2. SyncCoordinator detects pending changes → Writes to RTDB
+3. RTDB write succeeds → Update SwiftData `syncStatus: .synced`
+4. RTDB write fails → Retry with exponential backoff, keep `syncStatus: .pending`
+
+**Read Flow (RTDB → User):**
+1. RTDB listener observes change (new message, participant added, etc.)
+2. Fetch change from RTDB
+3. Update/insert into SwiftData with `syncStatus: .synced`
+4. SwiftUI views auto-update via `@Query`
+
+**Offline Behavior:**
+1. All writes queued in SwiftData with `syncStatus: .pending`
+2. NetworkMonitor detects connection restored
+3. SyncCoordinator processes queue: sync all pending items to RTDB
+4. UI shows sync progress via SyncProgressView
+
+**Service Responsibilities:**
+
+- **ConversationService:** CRUD operations on RTDB `/conversations/`
+- **MessageService:** CRUD operations on RTDB `/messages/`
+- **TypingIndicatorService:** Real-time updates to RTDB `/typing/`
+- **StorageService:** Upload group photos to Firebase Storage
+- **SyncCoordinator:** Orchestrates SwiftData ↔ RTDB synchronization
+- **Firestore:** Only accessed for user profile lookups (displayName, profilePictureURL)
+
+---
+
 ## User Stories
 
 ### Story 3.1: Create Group Conversation
@@ -40,7 +183,14 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Group appears in conversation list immediately
 - [ ] All participants receive notification of group creation
 - [ ] Creator automatically becomes group admin
-- [ ] Group persists locally and syncs to Firestore
+- [ ] Group persists locally and syncs to RTDB
+- [ ] Group creation limited to 256 participants maximum
+- [ ] Group name validated (non-empty after trim, 1-50 characters)
+- [ ] Duplicate participant prevention in selection UI
+- [ ] Offline group creation queued, syncs when connection restored
+- [ ] Group photo upload shows progress bar with cancel option
+- [ ] Group photo upload failure shows error toast with retry button
+- [ ] Deep link support: tapping notification opens group MessageThreadView
 
 **Technical Tasks:**
 1. Update ConversationEntity to support group metadata:
@@ -50,8 +200,8 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        @Attribute(.unique) var id: String
        var participantIDs: [String] // Multiple participants for groups
        var isGroup: Bool // true for groups, false for 1:1
-       var groupName: String? // nil for 1:1 chats
-       var groupPhotoURL: String?
+       var displayName: String? // Group name (nil for 1:1 chats)
+       var groupPhotoURL: String? // Group photo URL
        var adminUserIDs: [String] // Admins who can edit group
        var lastMessage: String?
        var lastMessageTimestamp: Date
@@ -65,7 +215,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
            id: String,
            participantIDs: [String],
            isGroup: Bool = false,
-           groupName: String? = nil,
+           displayName: String? = nil,
            groupPhotoURL: String? = nil,
            adminUserIDs: [String] = [],
            lastMessage: String? = nil,
@@ -79,7 +229,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
            self.id = id
            self.participantIDs = participantIDs
            self.isGroup = isGroup
-           self.groupName = groupName
+           self.displayName = displayName
            self.groupPhotoURL = groupPhotoURL
            self.adminUserIDs = adminUserIDs
            self.lastMessage = lastMessage
@@ -175,7 +325,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                id: UUID().uuidString,
                participantIDs: participantIDs,
                isGroup: true,
-               groupName: groupName,
+               displayName: groupName,
                adminUserIDs: [AuthService.shared.currentUserID]
            )
 
@@ -198,9 +348,22 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                }
            }
 
-           // Sync to Firestore
+           // Sync to RTDB
            Task.detached {
-               try? await ConversationService.shared.syncConversation(conversation)
+               try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+               // Send system message to RTDB
+               let systemMessage = MessageEntity(
+                   id: UUID().uuidString,
+                   conversationID: conversation.id,
+                   senderID: "system",
+                   text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") created the group",
+                   createdAt: Date(),
+                   status: .sent,
+                   syncStatus: .synced,
+                   isSystemMessage: true
+               )
+               try? await MessageService.shared.sendMessageToRTDB(systemMessage)
            }
 
            dismiss()
@@ -210,7 +373,12 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
 3. Create ParticipantPickerView component
 4. Update ConversationListView to show "New Group" button
-5. Update ConversationService to handle group creation in Firestore
+5. Update ConversationService to handle group creation in RTDB:
+   - Write to `/conversations/{conversationID}` with group metadata
+   - Use RTDB transaction to ensure atomic creation
+   - Set participantIDs as object: `{ "user1": true, "user2": true }` (faster lookups)
+   - Set adminUserIDs as object: `{ "user1": true }`
+   - Add RTDB listener for real-time updates to this conversation
 
 **References:**
 - SwiftData Implementation Guide Section 3.2 (ConversationEntity updates)
@@ -229,6 +397,13 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] "Edit Group" button visible only to admins
 - [ ] "Leave Group" button at bottom (destructive action)
 - [ ] "Add Participants" button for admins
+- [ ] Deleted user accounts shown as "Deleted User" with placeholder avatar
+- [ ] Lazy loading for participant lists with 50+ members
+- [ ] Concurrent participant removal handled gracefully (no duplicate removal errors)
+- [ ] User automatically navigates back if removed while viewing group
+- [ ] Last admin cannot leave without transferring admin rights first
+- [ ] "Leave Group" shows admin transfer dialog if user is last admin
+- [ ] If last admin force-leaves, oldest member automatically becomes admin
 
 **Technical Tasks:**
 1. Create GroupInfoView:
@@ -264,7 +439,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                        .clipShape(Circle())
 
                        // Group name
-                       Text(conversation.groupName ?? "Unnamed Group")
+                       Text(conversation.displayName ?? "Unnamed Group")
                            .font(.system(size: 22, weight: .bold))
 
                        Text("\(conversation.participantIDs.count) participants")
@@ -369,11 +544,26 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
        private func removeParticipant(_ participant: UserEntity) {
            conversation.participantIDs.removeAll { $0 == participant.id }
+           conversation.updatedAt = Date()
+           conversation.syncStatus = .pending
            try? modelContext.save()
 
-           // Sync to Firestore
+           // Sync to RTDB
            Task.detached {
-               try? await ConversationService.shared.syncConversation(conversation)
+               try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+               // Send system message
+               let systemMessage = MessageEntity(
+                   id: UUID().uuidString,
+                   conversationID: conversation.id,
+                   senderID: "system",
+                   text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") removed \(participant.displayName)",
+                   createdAt: Date(),
+                   status: .sent,
+                   syncStatus: .synced,
+                   isSystemMessage: true
+               )
+               try? await MessageService.shared.sendMessageToRTDB(systemMessage)
            }
 
            // Reload participants
@@ -381,14 +571,39 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        }
 
        private func leaveGroup() async {
-           conversation.participantIDs.removeAll {
-               $0 == AuthService.shared.currentUserID
+           let currentUserID = AuthService.shared.currentUserID
+           let isLastAdmin = conversation.adminUserIDs.count == 1 &&
+                             conversation.adminUserIDs.contains(currentUserID)
+
+           // If last admin, must transfer admin rights first
+           if isLastAdmin && conversation.participantIDs.count > 1 {
+               // Show admin transfer dialog (UI task)
+               showAdminTransferDialog = true
+               return
            }
+
+           // Remove self from participants
+           conversation.participantIDs.removeAll { $0 == currentUserID }
+           conversation.adminUserIDs.removeAll { $0 == currentUserID }
            conversation.isArchived = true
+           conversation.syncStatus = .pending
            try? modelContext.save()
 
-           // Sync to Firestore
-           try? await ConversationService.shared.syncConversation(conversation)
+           // Sync to RTDB
+           try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+           // Send system message
+           let systemMessage = MessageEntity(
+               id: UUID().uuidString,
+               conversationID: conversation.id,
+               senderID: "system",
+               text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") left the group",
+               createdAt: Date(),
+               status: .sent,
+               syncStatus: .synced,
+               isSystemMessage: true
+           )
+           try? await MessageService.shared.sendMessageToRTDB(systemMessage)
        }
    }
    ```
@@ -413,6 +628,13 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] Removed participants see "You were removed from [group name]"
 - [ ] Participant changes sync to all group members in real-time
 - [ ] Minimum 2 participants enforced (cannot remove if only 2 left)
+- [ ] New participants see messages from join time forward only (not historical messages)
+- [ ] New participants see system message: "You were added to this group"
+- [ ] System messages batched: "Alice added 10 participants" (not 10 separate messages)
+- [ ] Minimum 2 participants enforced (group auto-archives if only 1 remains)
+- [ ] Typing indicators cleaned up when participant removed
+- [ ] App badge count includes unread group messages
+- [ ] Offline participant add/remove queued for sync when online
 
 **Technical Tasks:**
 1. Create AddParticipantsView:
@@ -492,25 +714,38 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        private func addParticipants() {
            conversation.participantIDs.append(contentsOf: selectedUserIDs)
            conversation.updatedAt = Date()
+           conversation.syncStatus = .pending
            try? modelContext.save()
 
-           // Sync to Firestore
+           // Sync to RTDB
            Task.detached {
-               try? await ConversationService.shared.syncConversation(conversation)
+               try? await ConversationService.shared.syncConversationToRTDB(conversation)
 
-               // Send system message
+               // Send batched system message
+               let addedCount = selectedUserIDs.count
+               let systemMessageText: String
+
+               if addedCount == 1 {
+                   // Fetch added user's display name
+                   let addedUserID = selectedUserIDs.first!
+                   let addedUserName = await fetchDisplayName(for: addedUserID) ?? "Someone"
+                   systemMessageText = "\(AuthService.shared.currentUser?.displayName ?? "Someone") added \(addedUserName)"
+               } else {
+                   systemMessageText = "\(AuthService.shared.currentUser?.displayName ?? "Someone") added \(addedCount) participants"
+               }
+
                let systemMessage = MessageEntity(
                    id: UUID().uuidString,
                    conversationID: conversation.id,
                    senderID: "system",
-                   text: "\(AuthService.shared.currentUser?.displayName ?? "Someone") added \(selectedUserIDs.count) participant(s)",
+                   text: systemMessageText,
                    createdAt: Date(),
                    status: .sent,
                    syncStatus: .synced,
                    isSystemMessage: true
                )
 
-               try? await MessageService.shared.syncMessage(systemMessage)
+               try? await MessageService.shared.sendMessageToRTDB(systemMessage)
            }
 
            dismiss()
@@ -544,9 +779,13 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - [ ] "Edit Group Info" button opens edit sheet
 - [ ] User can change group name (1-50 characters)
 - [ ] User can upload new group photo via image picker
-- [ ] Changes save locally and sync to Firestore
+- [ ] Changes save locally and sync to RTDB
 - [ ] All group members see updated info in real-time
 - [ ] System message posted: "Alice changed the group name to..."
+- [ ] Concurrent edit conflict detection: show toast if another admin changed name
+- [ ] Group photo upload shows progress bar (0-100%) with cancel option
+- [ ] Large photos (>5MB) compressed before upload
+- [ ] Upload failure shows specific error (network, quota, etc.) with retry button
 
 **Technical Tasks:**
 1. Create EditGroupInfoView:
@@ -564,7 +803,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
        init(conversation: ConversationEntity) {
            self.conversation = conversation
-           _groupName = State(initialValue: conversation.groupName ?? "")
+           _groupName = State(initialValue: conversation.displayName ?? "")
        }
 
        var body: some View {
@@ -637,10 +876,10 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
        }
 
        private func saveChanges() async {
-           let oldName = conversation.groupName
+           let oldName = conversation.displayName
 
            // Update group name
-           conversation.groupName = groupName
+           conversation.displayName = groupName
            conversation.updatedAt = Date()
            try? modelContext.save()
 
@@ -659,11 +898,14 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                isUploading = false
            }
 
-           // Sync to Firestore
-           Task.detached {
-               try? await ConversationService.shared.syncConversation(conversation)
+           // Sync to RTDB
+           conversation.syncStatus = .pending
+           try? modelContext.save()
 
-               // Post system message
+           Task.detached {
+               try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+               // Post system message if name changed
                if oldName != groupName {
                    let systemMessage = MessageEntity(
                        id: UUID().uuidString,
@@ -676,7 +918,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
                        isSystemMessage: true
                    )
 
-                   try? await MessageService.shared.syncMessage(systemMessage)
+                   try? await MessageService.shared.sendMessageToRTDB(systemMessage)
                }
            }
 
@@ -753,6 +995,7 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
    @Model
    final class MessageEntity {
        // ... existing properties ...
+       var isSystemMessage: Bool = false // true for "Alice joined", etc.
        var readBy: [String: Date] = [:] // userID -> readAt timestamp
    }
    ```
@@ -834,6 +1077,119 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
 ---
 
+### Story 3.7: Group Message Notifications
+**As a user, I want to receive push notifications when someone sends a message in a group so I stay updated on group conversations.**
+
+**Acceptance Criteria:**
+- [ ] Group message triggers FCM notification to all participants except sender
+- [ ] Notification title format: "{SenderName} in {GroupName}"
+- [ ] Notification body shows message preview (truncated to 100 characters)
+- [ ] Tapping notification deep links to MessageThreadView for that group
+- [ ] Notification includes conversationID in data payload for deep linking
+- [ ] Multiple messages from same group stack together (iOS notification grouping)
+- [ ] System messages (joins, leaves) don't trigger notifications
+- [ ] Group photo shown as notification icon (if available)
+- [ ] Notification sound plays for unmuted groups
+- [ ] Works with offline queue: queued messages send notifications when synced
+
+**Technical Tasks:**
+
+1. Update Cloud Functions `onMessageCreated` to detect group conversations (extend Story 2.0B)
+2. Implement multi-recipient FCM sending for all group participants except sender
+3. Add notification grouping by thread-id (conversationID) for message stacking
+4. Update iOS AppDelegate to handle group conversation deep links
+5. Test notification delivery with 3+ participant groups
+6. Deploy updated Cloud Functions to production
+
+**Dev Notes:**
+
+### Cloud Functions Extension (functions/src/index.ts)
+
+**Key Changes from 1:1 Chat (Story 2.0B):**
+- Detect `isGroup` flag in RTDB conversation
+- Loop through all participantIDs to send FCM (exclude sender)
+- Use `sendEachForMulticast` instead of `send` for multiple recipients
+- Title format: "{SenderName} in {GroupName}" instead of just sender name
+- Add `threadId` to APNS payload for notification stacking
+
+**RTDB Schema for Group Conversations:**
+```
+/conversations/{conversationID}/
+  ├── participantIDs: { "user1": true, "user2": true, "user3": true }
+  ├── isGroup: true
+  ├── groupName: "Family Group"
+```
+
+**FCM Notification Payload Structure (Group):**
+```json
+{
+  "notification": {
+    "title": "Alice Smith in Family Group",
+    "body": "Hey everyone, how's it going?"
+  },
+  "data": {
+    "conversationID": "group_abc123",
+    "messageID": "msg_xyz789",
+    "type": "new_message",
+    "senderID": "user1",
+    "isGroup": "true",
+    "timestamp": "1704067200000"
+  },
+  "apns": {
+    "payload": {
+      "aps": {
+        "sound": "default",
+        "badge": 1,
+        "threadId": "group_abc123"
+      }
+    }
+  }
+}
+```
+
+**Deep Linking Flow:**
+1. User taps notification
+2. AppDelegate receives userInfo with conversationID
+3. Post NotificationCenter event: "OpenConversation"
+4. RootView observes event, presents MessageThreadView
+
+**Testing Standards:**
+
+**Unit Tests:**
+- [ ] Test notification payload generation for group vs 1:1
+- [ ] Test recipient filtering (excludes sender)
+- [ ] Test message text truncation at 100 chars
+- [ ] Test system message filtering (no notifications)
+
+**Integration Tests:**
+- [ ] Test Cloud Function triggers on RTDB message creation
+- [ ] Test FCM send to multiple recipients
+- [ ] Test deep link navigation to group conversation
+- [ ] Test notification stacking (same thread-id)
+
+**Manual Testing:**
+- [ ] Create group with 3 users (User A, User B, User C)
+- [ ] User A sends message
+- [ ] Verify User B and User C receive notification
+- [ ] Verify notification title: "User A in {GroupName}"
+- [ ] Tap notification on User B's device → opens MessageThreadView
+- [ ] User A sends 5 rapid messages
+- [ ] Verify notifications stack under single thread on User B's device
+
+**References:**
+- Story 2.0B: Cloud Functions FCM Implementation
+- Epic 2: One-on-One Chat Infrastructure
+- Firebase Cloud Messaging Docs
+
+**Estimated Time:** 45 minutes
+
+**Dependencies:**
+- ✅ Story 2.0B (Cloud Functions FCM) - Extends existing function
+- ✅ Story 3.1 (Create Group) - Requires group conversations in RTDB
+- ✅ Epic 1 (Authentication) - Requires user profiles in Firestore
+
+---
+
 ## Dependencies & Prerequisites
 
 ### Required Epics:
@@ -901,24 +1257,28 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 | Story | Estimated Time |
 |-------|---------------|
 | 3.1 Create Group Conversation | 60 mins |
-| 3.2 Group Info Screen | 45 mins |
-| 3.3 Add and Remove Participants | 45 mins |
-| 3.4 Edit Group Name and Photo | 30 mins |
-| 3.5 Group Typing Indicators | 20 mins |
-| 3.6 Group Read Receipts | 40 mins |
-| **Total** | **3-4 hours** |
+| 3.2 Group Info Screen | 50 mins |
+| 3.3 Add and Remove Participants | 50 mins |
+| 3.4 Edit Group Name and Photo | 35 mins |
+| 3.5 Group Typing Indicators | 30 mins |
+| 3.6 Group Read Receipts | 45 mins |
+| 3.7 Group Message Notifications | 45 mins |
+| **Total** | **5-6 hours** |
 
 ---
 
 ## Implementation Order
 
 **Recommended sequence:**
-1. Story 3.1 (Create Group) - Foundation
-2. Story 3.2 (Group Info) - Management UI
-3. Story 3.3 (Add/Remove Participants) - Core management
-4. Story 3.4 (Edit Group Info) - Customization
-5. Story 3.5 (Typing Indicators) - Polish
-6. Story 3.6 (Read Receipts) - Advanced feature
+1. Story 3.1 (Create Group) - Foundation (requires RTDB setup)
+2. Story 3.7 (Group Notifications) - Critical path (extends Story 2.0B Cloud Functions)
+3. Story 3.2 (Group Info) - Management UI
+4. Story 3.3 (Add/Remove Participants) - Core management
+5. Story 3.4 (Edit Group Info) - Customization
+6. Story 3.5 (Typing Indicators) - Real-time polish (RTDB)
+7. Story 3.6 (Read Receipts) - Advanced feature (RTDB)
+
+**Critical Path:** Stories 3.1 → 3.7 must be completed first to enable basic group messaging with notifications.
 
 ---
 
@@ -928,6 +1288,104 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 - **Architecture Doc**: `docs/architecture.md` (Section 5: Data Flow)
 - **UX Design Doc**: `docs/ux-design.md` (Section 3.3: Group Info)
 - **PRD**: `docs/prd.md` (Epic 3: Group Chat)
+
+---
+
+## Post-MVP Enhancements (Deferred)
+
+The following features were identified during Epic 3 planning but deferred to post-MVP to maintain sprint velocity:
+
+### Story 3.8: Mute Group Notifications
+**Priority:** P2 (Medium)
+**Estimated Time:** 30 minutes
+
+**Features:**
+- [ ] User can mute specific groups from Group Info screen
+- [ ] Muted groups don't send FCM notifications (Cloud Functions check)
+- [ ] Unmute option in Group Info screen
+- [ ] Mute duration options (1 hour, 8 hours, 1 day, 1 week, forever)
+- [ ] Muted groups show mute icon in ConversationListView
+- [ ] Mute status stored in Firestore `/users/{userID}/mutedConversations/{conversationID}`
+
+**Technical Notes:**
+- Cloud Functions must check mute status before sending FCM:
+  ```typescript
+  const mutedDoc = await firestore
+    .collection('users')
+    .doc(recipientID)
+    .collection('mutedConversations')
+    .doc(conversationID)
+    .get();
+
+  if (mutedDoc.exists && mutedDoc.data()?.mutedUntil > Date.now()) {
+    // Skip notification for this recipient
+    continue;
+  }
+  ```
+
+---
+
+### Story 3.9: Notification Grouping & Rich Actions
+**Priority:** P3 (Low)
+**Estimated Time:** 60 minutes
+
+**Features:**
+- [ ] Multiple messages from same group stack into single expandable notification
+- [ ] Notification shows: "3 new messages in Family Group"
+- [ ] Inline reply from notification (iOS notification actions)
+- [ ] Mark as Read action in notification
+- [ ] Multi-device notification deduplication (clear on one device = clear on all)
+
+**Technical Notes:**
+- Requires iOS Notification Service Extension
+- Requires custom notification payload with `collapse_id`
+- Requires RTDB tracking of read status per device
+
+---
+
+### Story 3.10: Advanced Group Features
+**Priority:** P3 (Low)
+**Estimated Time:** 2-3 hours
+
+**Features:**
+- [ ] Group invite approval (user consent before joining)
+- [ ] Restrict who can send messages (admins only mode)
+- [ ] Group description field (shown in Group Info)
+- [ ] Pinned messages in groups
+- [ ] Group search (find groups by name)
+- [ ] Group categories/tags
+- [ ] Archive/unarchive groups
+- [ ] Group member roles (admin, moderator, member)
+
+---
+
+### Story 3.11: Group Media Gallery
+**Priority:** P3 (Low)
+**Estimated Time:** 90 minutes
+
+**Features:**
+- [ ] Shared media tab in Group Info
+- [ ] Grid view of all images/videos sent in group
+- [ ] Filter by media type (photos, videos, files, links)
+- [ ] Download all media option
+- [ ] Delete media from conversation (admins only)
+
+---
+
+### Story 3.12: Group Analytics (Admin Only)
+**Priority:** P4 (Nice-to-Have)
+**Estimated Time:** 45 minutes
+
+**Features:**
+- [ ] Message activity graph (messages per day)
+- [ ] Most active members chart
+- [ ] Peak messaging hours
+- [ ] Group growth over time
+
+---
+
+**Total Post-MVP Scope:** 5-7 hours additional work
+**Recommended Phase:** After MVP launch, based on user feedback
 
 ---
 

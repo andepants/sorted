@@ -28,6 +28,22 @@ Implement the core one-on-one messaging infrastructure with SwiftData local pers
 
 ---
 
+### iOS-Specific Mobile Messaging Patterns
+
+**This epic implements mobile-first messaging** - follow iOS messaging app conventions:
+
+- ✅ **Keyboard Handling:** Message composer dismisses keyboard intelligently, doesn't obscure input
+- ✅ **Scroll Performance:** LazyVStack for message lists, scroll to bottom on new messages with animation
+- ✅ **Haptic Feedback:** Subtle haptic on message send success
+- ✅ **Pull-to-Refresh:** Native iOS pattern for manual conversation sync
+- ✅ **Swipe Actions:** Swipe-to-archive conversations (iOS standard)
+- ✅ **Network Awareness:** Show "Offline" badge in nav bar when no connection
+- ✅ **Loading States:** Skeleton screens for empty conversation lists
+- ✅ **Accessibility:** VoiceOver announces new messages, proper labels for all UI
+- ✅ **Safe Areas:** Message composer respects keyboard and home indicator
+
+---
+
 ## User Stories
 
 ### Story 2.1: Create New Conversation
@@ -92,6 +108,13 @@ Implement the core one-on-one messaging infrastructure with SwiftData local pers
    ```
 5. Create ConversationService for Firestore operations
 6. Add duplicate prevention logic (check by participantIDs set)
+
+**iOS Mobile Considerations:**
+- **Keyboard Dismissal:** When navigating to conversation, automatically dismiss keyboard from previous screen
+- **Loading State:** Show subtle loading indicator during conversation creation (not full-screen)
+- **Haptic Feedback:** Light impact haptic when conversation created successfully
+- **Error Handling:** Use native `.alert()` if duplicate detected or creation fails
+- **Accessibility:** Announce "Conversation created with [user]" to VoiceOver
 
 **References:**
 - SwiftData Implementation Guide Section 3.2 (ConversationEntity)
@@ -233,6 +256,15 @@ Implement the core one-on-one messaging infrastructure with SwiftData local pers
 3. Implement real-time Firestore listener in ConversationService
 4. Add pull-to-refresh with syncConversations()
 5. Implement swipe-to-archive functionality
+
+**iOS Mobile Considerations:**
+- **Pull-to-Refresh:** Use native `.refreshable { }` modifier (shows iOS spinner at top)
+- **Swipe Actions:** Use `.swipeActions(edge: .trailing)` for archive (iOS standard right swipe)
+- **List Performance:** Use `LazyVStack` or native `List` for smooth scrolling with large conversation lists
+- **Empty State:** Use `ContentUnavailableView` (iOS 17+) for "No conversations" placeholder
+- **Unread Badge:** Use native badge view or ZStack with Circle for unread count indicators
+- **Accessibility:** Each conversation row should have proper accessibility labels including unread status
+- **Safe Areas:** Ensure list respects top safe area (notch/Dynamic Island)
 
 **References:**
 - UX Design Doc Section 3.1 (Conversation List Screen)
@@ -454,6 +486,33 @@ Implement the core one-on-one messaging infrastructure with SwiftData local pers
 4. Create MessageComposerView with character counter
 5. Implement MessageService for Firestore operations
 
+**iOS Mobile Considerations:**
+- **Keyboard Management:**
+  - Dismiss keyboard on send with `.focused()` binding
+  - Automatically show keyboard when view appears for quick messaging
+  - Use `.submitLabel(.send)` on text field for "Send" keyboard button
+- **Scroll Behavior:**
+  - Auto-scroll to bottom when new message arrives (with animation)
+  - Use `ScrollViewReader` for programmatic scrolling
+  - Maintain scroll position when keyboard appears/disappears
+- **Message Composer:**
+  - Character counter shows remaining chars (e.g., "9,850 / 10,000")
+  - Multi-line text input expands up to 5 lines, then scrolls
+  - Use `.lineLimit(1...5)` for text field
+- **Haptic Feedback:**
+  - Light impact haptic on message send success
+  - Error haptic if send fails
+- **Loading States:**
+  - Show inline "sending..." status in message bubble while uploading
+  - Use subtle progress indicator for long network delays
+- **Accessibility:**
+  - VoiceOver reads messages in chronological order
+  - Announce new incoming messages: "New message from [sender]"
+  - Label send button as "Send message"
+- **Safe Areas:**
+  - Message composer respects keyboard height and home indicator
+  - Use `.safeAreaInset(edge: .bottom)` for composer
+
 **References:**
 - SwiftData Implementation Guide Section 7 (Message Sync Strategy)
 - Architecture Doc Section 5.4 (Real-time Message Delivery)
@@ -573,7 +632,7 @@ Implement the core one-on-one messaging infrastructure with SwiftData local pers
        @Published var pendingCount = 0
 
        private let monitor = NWPathMonitor()
-       private let queue = DispatchQueue(label: "com.messageai.sync")
+       private let queue = DispatchQueue(label: "com.sorted.sync")
        private let modelContext: ModelContext
 
        init() {

@@ -1,61 +1,90 @@
-//
-//  ContentView.swift
-//  sorted
-//
-//  Created by Andrew Heim on 10/20/25.
-//
+/// ContentView.swift
+/// Sorted - AI-Powered Messaging App
+///
+/// Placeholder view for initial project setup.
+/// Will be replaced with actual messaging UI in later stories.
 
 import SwiftData
 import SwiftUI
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @EnvironmentObject var authViewModel: AuthViewModel
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
+        NavigationView {
+            VStack(spacing: 20) {
+                Image(systemName: "message.fill")
+                    .imageScale(.large)
+                    .foregroundStyle(.tint)
+                    .font(.system(size: 60))
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
+                Text("Sorted")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+                Text("AI-Powered Messaging")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+                    .frame(height: 40)
+
+                // Show current user info
+                if let user = authViewModel.currentUser {
+                    VStack(spacing: 8) {
+                        Text("Logged in as:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(user.displayName)
+                            .font(.headline)
+                        Text(user.email)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(10)
+                }
+
+                Spacer()
+
+                // Navigation to Profile
+                NavigationLink(destination: ProfileView()) {
+                    Text("Go to Profile")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .padding(.horizontal)
+
+                // Test logout button
+                Button(
+                    action: {
+                        Task {
+                            await authViewModel.logout()
+                        }
+                    },
+                    label: {
+                        Text("Logout (Test)")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .cornerRadius(10)
+                    }
+                )
+                .padding(.horizontal)
             }
+            .padding()
+            .navigationTitle("Home")
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .environmentObject(AuthViewModel())
+        .modelContainer(PreviewContainer.shared)
 }

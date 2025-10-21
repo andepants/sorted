@@ -1,4 +1,4 @@
-# MessageAI - UX/UI Specifications
+# Sorted - UX/UI Specifications
 
 **Version:** 1.0
 **Last Updated:** October 20, 2025
@@ -58,7 +58,7 @@
 
 ```
 ┌─────────────────────────────┐
-│     MessageAI               │
+│     Sorted               │
 ├─────────────────────────────┤
 │                             │
 │    [Screen Content]         │
@@ -286,7 +286,7 @@ Root (TabView)
 │                             │
 │     [App Icon - Large]      │
 │                             │
-│      MessageAI              │
+│      Sorted              │
 │   AI-Powered Messaging      │
 │   for Content Creators      │
 │                             │
@@ -766,7 +766,7 @@ struct OpportunityScoreView: View {
 │  │ Notifications       [>]││
 │  │ Privacy             [>]││
 │  │ Help & Support      [>]││
-│  │ About MessageAI     [>]││
+│  │ About Sorted     [>]││
 │  └─────────────────────────┘│
 │                             │
 │  [Sign Out]                 │
@@ -2434,7 +2434,7 @@ NavigationStack(path: $navigationPath) {
 **Deep Linking:**
 ```swift
 .onOpenURL { url in
-    if url.scheme == "messageai",
+    if url.scheme == "sorted",
        url.host == "conversation",
        let id = url.pathComponents.last {
         navigationPath.append(Conversation(id: id))
@@ -2447,9 +2447,9 @@ NavigationStack(path: $navigationPath) {
 ### 15.4 File Organization
 
 ```
-MessageAI/
+Sorted/
 ├── App/
-│   ├── MessageAIApp.swift
+│   ├── SortedApp.swift
 │   └── AppDelegate.swift
 ├── Core/
 │   ├── Models/

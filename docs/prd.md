@@ -1,4 +1,4 @@
-# MessageAI - Product Requirements Document v2.0
+# Sorted - Product Requirements Document v2.0
 
 **Version:** 2.0 (AI-First Architecture Edition)
 **Last Updated:** October 20, 2025
@@ -36,7 +36,7 @@
 
 ### 1.1 Product Overview
 
-**MessageAI** is an iOS-native messaging application specifically designed for content creators managing high-volume DM communications. Built with AI-first principles and modern Swift 6 concurrency, the app intelligently categorizes messages, drafts authentic responses, and surfaces business opportunities—all while maintaining a clean, maintainable codebase optimized for AI-assisted development.
+**Sorted** is an iOS-native messaging application specifically designed for content creators managing high-volume DM communications. Built with AI-first principles and modern Swift 6 concurrency, the app intelligently categorizes messages, drafts authentic responses, and surfaces business opportunities—all while maintaining a clean, maintainable codebase optimized for AI-assisted development.
 
 ### 1.2 What Makes This AI-First?
 
@@ -460,7 +460,7 @@ User Action → View → ViewModel → Service → Firebase
 - Spend less time on repetitive questions
 - Remember context from past conversations
 
-**How MessageAI Helps:**
+**How Sorted Helps:**
 - Auto-categorization surfaces business messages
 - FAQ auto-responder handles repetitive questions
 - AI drafts use Supermemory to maintain conversation context
@@ -470,7 +470,7 @@ User Action → View → ViewModel → Service → Firebase
 
 ### 6.2 Use Case 1: Morning Message Triage
 
-**Current Flow (Without MessageAI):**
+**Current Flow (Without Sorted):**
 1. Opens Instagram DMs (15 messages) - manually scans each
 2. Responds to 2 business inquiries
 3. Skips most fan messages (no time)
@@ -478,8 +478,8 @@ User Action → View → ViewModel → Service → Firebase
 5. **Total time: 45 minutes**
 6. **Result: 40 fan messages ignored**
 
-**New Flow (With MessageAI):**
-1. Opens MessageAI app
+**New Flow (With Sorted):**
+1. Opens Sorted app
 2. Sees 3 business messages in Business tab (auto-categorized)
 3. Sees 2 urgent messages in Priority tab (sentiment-flagged)
 4. Taps "Draft Reply" → AI uses Supermemory to recall past conversation context
@@ -499,7 +499,7 @@ User Action → View → ViewModel → Service → Firebase
 4. Fan feels ignored/forgotten
 5. **Result: Lost connection with engaged fan**
 
-**New Flow (With MessageAI + Supermemory):**
+**New Flow (With Sorted + Supermemory):**
 1. Fan sends follow-up message
 2. Supermemory retrieves previous conversation context
 3. AI Draft: "Yes! I finally went last week and the pasta was amazing. Thanks again for the rec! 🍝"
@@ -513,7 +513,7 @@ User Action → View → ViewModel → Service → Firebase
 4. **Result: $2,000 opportunity lost**
 
 **New Flow:**
-1. MessageAI categorizes as "Business"
+1. Sorted categorizes as "Business"
 2. Opportunity Scoring rates it 85/100 (high value)
 3. Push notification: "High-value business opportunity"
 4. Sarah responds within 1 hour
@@ -936,7 +936,7 @@ SwiftData models for local persistence using `@Model` macro.
 **Implementation Reference:**
 📖 See [SwiftData Implementation Guide](./swiftdata-implementation-guide.md) for complete code examples including:
 - Full @Model entity definitions with all properties and relationships
-- ModelContainer setup in MessageAIApp.swift
+- ModelContainer setup in SortedApp.swift
 - @Query usage in ViewModels and Views
 - Background sync patterns (write-first, read-first)
 - Error handling and retry strategies
@@ -964,9 +964,9 @@ All models conform to `Sendable` for Swift 6 concurrency safety:
 ### 11.1 Complete Project Structure
 
 ```
-MessageAI/
+Sorted/
 ├── App/
-│   └── MessageAIApp.swift
+│   └── SortedApp.swift
 │
 ├── Features/
 │   ├── Auth/
@@ -1020,11 +1020,11 @@ MessageAI/
 │   └── test/
 │
 ├── Tests/
-│   ├── MessageAITests/
+│   ├── SortedTests/
 │   │   ├── ViewModelTests/
 │   │   ├── ServiceTests/
 │   │   └── ModelTests/
-│   └── MessageAIUITests/
+│   └── SortedUITests/
 │
 ├── Resources/
 │   ├── GoogleService-Info.plist
@@ -1182,7 +1182,7 @@ Test only critical user flows:
 ### 14.3 Release Notes Template
 
 ```
-MessageAI - Beta v1.0.0
+Sorted - Beta v1.0.0
 
 🎉 WHAT'S NEW:
 • AI-powered message categorization
@@ -1686,7 +1686,7 @@ Development is organized into **vertical slices** - each epic delivers complete,
 - Quick tutorial with examples
 
 **Key User Stories:**
-- As a new creator, I understand what MessageAI does
+- As a new creator, I understand what Sorted does
 - As a new creator, I learn about AI features before using them
 - As a new creator, I grant necessary permissions
 - As a new creator, I can skip the tutorial if I want

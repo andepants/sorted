@@ -33,9 +33,12 @@ opt_in_rules:
   - vertical_whitespace_opening_braces # Enforce vertical whitespace after opening braces
   - closure_spacing # Enforce spacing in closures
   - redundant_nil_coalescing # Warn on redundant nil coalescing
-  - unused_import # Warn on unused imports
   - multiline_parameters # Enforce multiline parameters
   - multiline_arguments # Enforce multiline arguments
+
+# Analyzer rules (only run by 'swiftlint analyze')
+analyzer_rules:
+  - unused_import # Warn on unused imports
 
 # Rules with custom configuration
 line_length:
@@ -87,8 +90,6 @@ identifier_name:
 nesting:
   type_level:
     warning: 2
-  statement_level:
-    warning: 5
 
 force_cast: warning
 force_try: warning
