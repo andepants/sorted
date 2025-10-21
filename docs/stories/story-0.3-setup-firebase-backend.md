@@ -372,7 +372,7 @@ service firebase.storage {
 **All acceptance criteria verified and met:**
 
 - [x] Firebase project created with name `sorted-dev` (Actual: `sorted-d3844`)
-- [x] iOS app registered in Firebase with bundle ID (Production: `com.theheimlife.sorted`, Dev: `com.theheimlife.sorted.dev`)
+- [x] iOS app registered in Firebase with bundle ID (Production: `com.theheimlife2.sorted`, Dev: `com.theheimlife2.sorted.dev`)
 - [x] GoogleService-Info.plist downloaded and added to Xcode project
 - [x] Firebase initialized in SortedApp.swift
 - [x] Firestore database created in test mode (Configured via Firebase Console)
@@ -387,7 +387,7 @@ service firebase.storage {
 - Location: `/Users/andre/coding/sorted/sorted/Resources/GoogleService-Info.plist`
 - File exists: YES
 - Automatically included in target via PBXFileSystemSynchronizedRootGroup: YES
-- Bundle ID: `com.theheimlife.sorted`
+- Bundle ID: `com.theheimlife2.sorted`
 - Project ID: `sorted-d3844`
 - Storage Bucket: `sorted-d3844.firebasestorage.app`
 - All required keys present: YES
@@ -407,7 +407,7 @@ service firebase.storage {
 **4. Runtime Verification**
 - Firebase initialization successful: YES
 - Console logs show correct Project ID: YES (`sorted-d3844`)
-- Console logs show Bundle ID: YES (`com.theheimlife.sorted`)
+- Console logs show Bundle ID: YES (`com.theheimlife2.sorted`)
 - Firebase Crashlytics loaded: YES (Version 10.29.0)
 - No Firebase errors in console: YES
 - All services available (Auth, Firestore, Storage, Messaging): YES
@@ -432,7 +432,7 @@ service firebase.storage {
 
 ### Notes
 
-1. **Bundle ID Flexibility:** The implementation uses production bundle ID (`com.theheimlife.sorted`) in GoogleService-Info.plist while Xcode Debug configuration uses dev bundle ID (`com.theheimlife.sorted.dev`). Firebase handles this correctly, but for production deployment, ensure the plist matches the final bundle ID.
+1. **Bundle ID Flexibility:** The implementation uses production bundle ID (`com.theheimlife2.sorted`) in GoogleService-Info.plist while Xcode Debug configuration uses dev bundle ID (`com.theheimlife2.sorted.dev`). Firebase handles this correctly, but for production deployment, ensure the plist matches the final bundle ID.
 
 2. **Project Naming:** Story specified project name `sorted-dev`, but actual Firebase project is `sorted-d3844`. This is acceptable as Firebase appends unique identifiers. Functionality is identical.
 
@@ -472,7 +472,7 @@ All acceptance criteria met. Implementation follows best practices. No issues fo
 2025-10-20 17:09:53.714 sorted[90123:786745] [Firebase/Crashlytics] Version 10.29.0
 ✅ Firebase initialized successfully
    Project ID: sorted-d3844
-   Bundle ID: com.theheimlife.sorted
+   Bundle ID: com.theheimlife2.sorted
 ✅ SwiftData ModelContainer initialized successfully
    Entities: MessageEntity, ConversationEntity, UserEntity, AttachmentEntity, FAQEntity
 ```
@@ -490,14 +490,14 @@ All acceptance criteria met. Implementation follows best practices. No issues fo
 
 **Firebase Configuration Verified:**
 - Project ID: `sorted-d3844` (matches GoogleService-Info.plist)
-- Bundle ID: `com.theheimlife.sorted` (production bundle ID in plist)
-- Dev Bundle ID: `com.theheimlife.sorted.dev` (configured in Xcode for Debug builds)
+- Bundle ID: `com.theheimlife2.sorted` (production bundle ID in plist)
+- Dev Bundle ID: `com.theheimlife2.sorted.dev` (configured in Xcode for Debug builds)
 - Firebase Crashlytics: Version 10.29.0 loaded successfully
 - All Firebase services initialized without errors
 
 **Note on Bundle IDs:**
-- GoogleService-Info.plist contains production bundle ID: `com.theheimlife.sorted`
-- Xcode Debug configuration uses: `com.theheimlife.sorted.dev`
+- GoogleService-Info.plist contains production bundle ID: `com.theheimlife2.sorted`
+- Xcode Debug configuration uses: `com.theheimlife2.sorted.dev`
 - Firebase is flexible with bundle ID matching, so both work correctly
 - For production, ensure GoogleService-Info.plist matches deployment bundle ID
 

@@ -365,6 +365,290 @@ struct MessageThreadView: View {
 
 ---
 
+## Dev Notes
+
+**CRITICAL: This section contains ALL implementation context needed. Developer should NOT need to read external docs.**
+
+### TypingIndicatorService Extension for Multiple Users
+[Source: epic-3-group-chat.md lines 1133-1154]
+
+**Add formatTypingText Method:**
+```swift
+extension TypingIndicatorService {
+    /// Format typing text for multiple users in group
+    func formatTypingText(userIDs: Set<String>, participants: [UserEntity]) -> String {
+        let typingUsers = participants.filter { userIDs.contains($0.id) }
+
+        switch typingUsers.count {
+        case 0:
+            return ""
+        case 1:
+            return "\(typingUsers[0].displayName) is typing..."
+        case 2:
+            return "\(typingUsers[0].displayName) and \(typingUsers[1].displayName) are typing..."
+        case 3:
+            return "\(typingUsers[0].displayName), \(typingUsers[1].displayName), and \(typingUsers[2].displayName) are typing..."
+        default:
+            let others = typingUsers.count - 2
+            return "\(typingUsers[0].displayName), \(typingUsers[1].displayName), and \(others) others are typing..."
+        }
+    }
+}
+```
+
+**CRITICAL Typing Text Formats:**
+- 0 typers: "" (empty string)
+- 1 typer: "Alice is typing..."
+- 2 typers: "Alice and Bob are typing..."
+- 3 typers: "Alice, Bob, and Charlie are typing..."
+- 4+ typers: "Alice, Bob, and 2 others are typing..."
+
+### RTDB Typing Indicator Listener for Groups
+[Source: epic-3-group-chat.md lines 1156-1158]
+
+**MessageThreadView Typing Observation:**
+```swift
+// In MessageThreadView
+@State private var typingUserIDs: Set<String> = []
+@State private var participants: [UserEntity] = []
+
+private var typingText: String {
+    // Filter out current user (don't show own typing)
+    let otherTypingUserIDs = typingUserIDs.filter {
+        $0 != AuthService.shared.currentUserID
+    }
+
+    // Filter by current participants only (exclude removed users)
+    let validTypingUserIDs = otherTypingUserIDs.filter {
+        conversation.participantIDs.contains($0)
+    }
+
+    return TypingIndicatorService.shared.formatTypingText(
+        userIDs: validTypingUserIDs,
+        participants: participants
+    )
+}
+
+var body: some View {
+    VStack {
+        // Message list...
+
+        // Typing indicator
+        if !typingText.isEmpty {
+            HStack {
+                Text(typingText)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .italic()
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top, 4)
+        }
+
+        // Message input...
+    }
+    .task {
+        await loadParticipants()
+        await observeTypingIndicators()
+    }
+}
+
+private func observeTypingIndicators() async {
+    let typingRef = Database.database().reference()
+        .child("typing")
+        .child(conversation.id)
+
+    typingRef.observe(.value) { snapshot in
+        var userIDs: Set<String> = []
+
+        for child in snapshot.children {
+            if let snap = child as? DataSnapshot,
+               let data = snap.value as? [String: Any],
+               let isTyping = data["isTyping"] as? Bool,
+               isTyping {
+                userIDs.insert(snap.key)
+            }
+        }
+
+        typingUserIDs = userIDs
+    }
+}
+```
+
+### Display Name Resolution for Typing Users
+[Source: epic-3-group-chat.md lines 1157]
+
+**Fetch Participants Pattern:**
+```swift
+// In MessageThreadView.loadParticipants()
+private func loadParticipants() async {
+    let participantIDs = conversation.participantIDs
+    let descriptor = FetchDescriptor<UserEntity>(
+        predicate: #Predicate<UserEntity> { user in
+            participantIDs.contains(user.id)
+        }
+    )
+    participants = (try? modelContext.fetch(descriptor)) ?? []
+
+    // If not in SwiftData, fetch from Firestore
+    let missingUserIDs = participantIDs.filter { userID in
+        !participants.contains { $0.id == userID }
+    }
+
+    for userID in missingUserIDs {
+        if let userData = try? await Firestore.firestore()
+            .collection("users")
+            .document(userID)
+            .getDocument()
+            .data() {
+            let displayName = userData["displayName"] as? String ?? "Unknown"
+            let profilePictureURL = userData["profilePictureURL"] as? String
+
+            // Create UserEntity and add to participants
+            // (or just use displayName directly)
+        }
+    }
+}
+```
+
+**Fallback for Missing Users:**
+```swift
+// If user not found in SwiftData or Firestore
+let displayName = "Someone"
+```
+
+### Auto-Expiration with RTDB Server Timestamp
+[Source: epic-3-group-chat.md lines 1133-1162]
+
+**CRITICAL: RTDB auto-expires typing indicators after 3 seconds**
+
+**Client Sets Timestamp:**
+```swift
+// When user starts typing
+let typingRef = Database.database().reference()
+    .child("typing")
+    .child(conversationID)
+    .child(currentUserID)
+
+typingRef.setValue([
+    "isTyping": true,
+    "lastUpdated": [".sv": "timestamp"]  // Server timestamp
+])
+```
+
+**RTDB Rule Enforces Expiration (Already Configured):**
+```json
+{
+  "rules": {
+    "typing": {
+      "$conversationID": {
+        "$userID": {
+          ".read": true,
+          ".write": "$userID == auth.uid",
+          ".validate": "newData.child('lastUpdated').val() > (now - 3000)"
+        }
+      }
+    }
+  }
+}
+```
+
+**Client-Side Cleanup (Optional):**
+```swift
+// Remove typing indicator when user stops typing for 3 seconds
+Task {
+    try? await Task.sleep(nanoseconds: 3_000_000_000)  // 3 seconds
+    if !isTyping {
+        try? await typingRef.removeValue()
+    }
+}
+```
+
+### Filter Out Removed Participants
+[Source: epic-3-group-chat.md lines 1156-1158]
+
+**CRITICAL: Only show typing for current group members**
+
+```swift
+private var typingText: String {
+    // Filter out current user
+    let otherTypingUserIDs = typingUserIDs.filter {
+        $0 != AuthService.shared.currentUserID
+    }
+
+    // Filter by current participants only
+    let validTypingUserIDs = otherTypingUserIDs.filter {
+        conversation.participantIDs.contains($0)
+    }
+
+    // If user removed while typing, they're filtered out
+    return TypingIndicatorService.shared.formatTypingText(
+        userIDs: validTypingUserIDs,
+        participants: participants
+    )
+}
+```
+
+### 1:1 Chat Compatibility
+[Source: epic-3-group-chat.md lines 1133]
+
+**Existing 1:1 typing logic unchanged:**
+```swift
+// In MessageThreadView
+if conversation.isGroup {
+    // Use formatTypingText for multiple users
+    typingText = TypingIndicatorService.shared.formatTypingText(
+        userIDs: validTypingUserIDs,
+        participants: participants
+    )
+} else {
+    // Simple 1:1 typing indicator (existing logic)
+    if isOtherUserTyping {
+        typingText = "\(otherUserName) is typing..."
+    } else {
+        typingText = ""
+    }
+}
+```
+
+### File Modification Order
+
+**CRITICAL: Follow this exact sequence:**
+
+1. Update `TypingIndicatorService.swift` (add formatTypingText method)
+2. Update `MessageThreadView.swift` (observe typing, display typing text)
+
+### Testing Standards
+
+**Manual Testing Required (No Unit Tests for MVP):**
+- Test single typer (1 user typing)
+- Test two typers (2 users typing simultaneously)
+- Test three typers (3 users typing)
+- Test 4+ typers (multiple users, show "N others")
+- Test timeout (typing disappears after 3 seconds)
+- Test removed participant filtering
+- Test own typing not shown
+- Test 1:1 chat compatibility
+
+**CRITICAL Edge Cases:**
+1. Single typer → "{Name} is typing..."
+2. Two typers → "{Name1} and {Name2} are typing..."
+3. Three typers → "{Name1}, {Name2}, and {Name3} are typing..."
+4. 4+ typers → "{Name1}, {Name2}, and N others are typing..."
+5. User removed while typing → filtered out immediately
+6. Deleted user typing → show "Someone is typing..."
+7. Network disconnects → typing indicators freeze until reconnect
+8. Own typing → NOT shown to self
+
+**Performance Considerations:**
+- Use SwiftData cache for display names (avoid repeated Firestore calls)
+- Debounce RTDB typing updates (max 1 update per second)
+- Limit displayed names to first 3 (avoid UI overflow)
+- Filter participant IDs locally (don't query RTDB repeatedly)
+
+---
+
 ## Metadata
 
 **Created by:** @sm (Scrum Master Bob)
@@ -374,6 +658,45 @@ struct MessageThreadView: View {
 **Epic:** Epic 3: Group Chat
 **Story points:** 2
 **Priority:** P1
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-21 | 1.0 | Initial story creation | @sm (Scrum Master Bob) |
+| 2025-10-21 | 1.1 | Added Dev Notes section per template compliance | @po (Product Owner Sarah) |
+
+---
+
+## Dev Agent Record
+
+**This section is populated by the @dev agent during implementation.**
+
+### Agent Model Used
+
+*Agent model name and version will be recorded here by @dev*
+
+### Debug Log References
+
+*Links to debug logs or traces generated during development will be recorded here by @dev*
+
+### Completion Notes
+
+*Notes about task completion and any issues encountered will be recorded here by @dev*
+
+### File List
+
+*All files created, modified, or affected during story implementation will be listed here by @dev*
+
+---
+
+## QA Results
+
+**This section is populated by the @qa agent after reviewing the completed story implementation.**
+
+*QA validation results, test outcomes, and any issues found will be recorded here by @qa*
 
 ---
 

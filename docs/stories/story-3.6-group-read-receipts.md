@@ -419,6 +419,301 @@ extension MessageService {
 
 ---
 
+## Dev Notes
+
+**CRITICAL: This section contains ALL implementation context needed. Developer should NOT need to read external docs.**
+
+### MessageEntity readBy Field Extension
+[Source: epic-3-group-chat.md lines 1176-1184]
+
+**Add to MessageEntity Model:**
+```swift
+@Model
+final class MessageEntity {
+    // ... existing fields ...
+    var isSystemMessage: Bool = false
+    var readBy: [String: Date] = [:]  // userID -> readAt timestamp
+}
+```
+
+**CRITICAL:** This field syncs to RTDB at `/messages/{conversationID}/{messageID}/readBy/{userID}: timestamp`
+
+### ReadReceiptsView Implementation
+[Source: epic-3-group-chat.md lines 1186-1252]
+
+**Create ReadReceiptsView.swift:**
+```swift
+struct ReadReceiptsView: View {
+    let message: MessageEntity
+    let participants: [UserEntity]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Read") {
+                    ForEach(readParticipants) { participant in
+                        HStack {
+                            AsyncImage(url: URL(string: participant.profilePictureURL ?? "")) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Circle().fill(Color.gray.opacity(0.3))
+                            }
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+
+                            VStack(alignment: .leading) {
+                                Text(participant.displayName)
+                                    .font(.system(size: 16))
+
+                                if let readAt = message.readBy[participant.id] {
+                                    Text(readAt, style: .relative)
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !unreadParticipants.isEmpty {
+                    Section("Delivered") {
+                        ForEach(unreadParticipants) { participant in
+                            HStack {
+                                AsyncImage(url: URL(string: participant.profilePictureURL ?? "")) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: {
+                                    Circle().fill(Color.gray.opacity(0.3))
+                                }
+                                .frame(width: 36, height: 36)
+                                .clipShape(Circle())
+
+                                Text(participant.displayName)
+                                    .font(.system(size: 16))
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Read By")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private var readParticipants: [UserEntity] {
+        participants.filter { message.readBy[$0.id] != nil }
+            .sorted { (message.readBy[$0.id] ?? Date()) > (message.readBy[$1.id] ?? Date()) }
+    }
+
+    private var unreadParticipants: [UserEntity] {
+        participants.filter { message.readBy[$0.id] == nil && $0.id != message.senderID }
+    }
+}
+```
+
+**CRITICAL Participant Filtering:**
+- **Read:** `message.readBy[$0.id] != nil`
+- **Delivered:** `message.readBy[$0.id] == nil && $0.id != message.senderID`
+- **Exclude sender from delivered list**
+- **Sort by most recent read first:** `.sorted { readBy[$0] > readBy[$1] }`
+
+### MessageBubbleView Long Press Integration
+[Source: epic-3-group-chat.md lines 1254]
+
+**Add Long Press Gesture to MessageBubbleView:**
+```swift
+struct MessageBubbleView: View {
+    let message: MessageEntity
+    let conversation: ConversationEntity
+
+    @State private var showReadReceipts = false
+
+    private var isOwnMessage: Bool {
+        message.senderID == AuthService.shared.currentUserID
+    }
+
+    private var canShowReadReceipts: Bool {
+        isOwnMessage && conversation.isGroup && !message.isSystemMessage
+    }
+
+    var body: some View {
+        // Message bubble UI...
+        .onLongPressGesture {
+            if canShowReadReceipts {
+                showReadReceipts = true
+            }
+        }
+        .sheet(isPresented: $showReadReceipts) {
+            ReadReceiptsView(message: message, participants: participants)
+        }
+    }
+}
+```
+
+**CRITICAL Conditions:**
+- Only show for **own messages** (`senderID == currentUserID`)
+- Only show for **group chats** (`conversation.isGroup == true`)
+- **NOT** for system messages (`message.isSystemMessage == false`)
+- **NOT** for 1:1 chats (use simple checkmark instead)
+
+### Track Read Receipts in MessageService
+[Source: epic-3-group-chat.md lines 1255-1256]
+
+**Mark Message as Read:**
+```swift
+extension MessageService {
+    /// Mark message as read by current user
+    func markAsRead(messageID: String, conversationID: String) async throws {
+        let currentUserID = AuthService.shared.currentUserID ?? ""
+        let timestamp = Date()
+
+        // Update RTDB
+        let messageRef = Database.database().reference()
+            .child("messages")
+            .child(conversationID)
+            .child(messageID)
+            .child("readBy")
+            .child(currentUserID)
+
+        try await messageRef.setValue(timestamp.timeIntervalSince1970 * 1000)
+
+        // Update local SwiftData
+        let descriptor = FetchDescriptor<MessageEntity>(
+            predicate: #Predicate<MessageEntity> { msg in
+                msg.id == messageID
+            }
+        )
+        if let message = try? modelContext.fetch(descriptor).first {
+            message.readBy[currentUserID] = timestamp
+            try? modelContext.save()
+        }
+    }
+}
+```
+
+**CRITICAL: When to mark as read:**
+- When MessageThreadView appears with messages visible
+- Mark ALL visible messages as read (not just latest)
+- Use `.task` modifier, NOT `.onAppear`
+
+**Pattern in MessageThreadView:**
+```swift
+.task {
+    // Mark all visible messages as read
+    for message in visibleMessages where message.senderID != currentUserID {
+        try? await MessageService.shared.markAsRead(
+            messageID: message.id,
+            conversationID: conversation.id
+        )
+    }
+}
+```
+
+### RTDB Listener for Real-Time Read Receipt Updates
+[Source: epic-3-group-chat.md lines 1256]
+
+**Listen to readBy Changes:**
+```swift
+// In MessageThreadView
+.task {
+    // Listen to read receipt updates for current conversation
+    let messagesRef = Database.database().reference()
+        .child("messages")
+        .child(conversation.id)
+
+    messagesRef.observe(.childChanged) { snapshot in
+        guard let messageData = snapshot.value as? [String: Any],
+              let readByData = messageData["readBy"] as? [String: Double] else { return }
+
+        // Update local MessageEntity
+        let messageID = snapshot.key
+        let descriptor = FetchDescriptor<MessageEntity>(
+            predicate: #Predicate<MessageEntity> { msg in
+                msg.id == messageID
+            }
+        )
+        if let message = try? modelContext.fetch(descriptor).first {
+            message.readBy = readByData.mapValues { Date(timeIntervalSince1970: $0 / 1000) }
+            try? modelContext.save()
+        }
+    }
+}
+```
+
+### System Messages Don't Have Read Receipts
+[Source: epic-3-group-chat.md lines 1254]
+
+**CRITICAL: Disable long press for system messages**
+
+```swift
+private var canShowReadReceipts: Bool {
+    isOwnMessage &&
+    conversation.isGroup &&
+    !message.isSystemMessage  // CRITICAL: No read receipts for system messages
+}
+```
+
+### Timestamp Display with Relative Style
+[Source: Story 3.6 specification lines 166-170]
+
+**Use `.relative` style for timestamps:**
+```swift
+if let readAt = message.readBy[participant.id] {
+    Text(readAt, style: .relative)  // "5 minutes ago", "now", "yesterday"
+        .font(.system(size: 14))
+        .foregroundColor(.secondary)
+}
+```
+
+**Formats:**
+- Just read: "now"
+- Recent: "5 minutes ago", "1 hour ago"
+- Today: "2 hours ago"
+- Yesterday: "yesterday"
+- Older: "2 days ago"
+
+### File Modification Order
+
+**CRITICAL: Follow this exact sequence:**
+
+1. ✅ Update `MessageEntity.swift` (add readBy field) - **May already exist**
+2. Create `ReadReceiptsView.swift` (read receipt sheet)
+3. Update `MessageBubbleView.swift` (add long press gesture)
+4. Update `MessageService.swift` (track read receipts)
+5. Update `MessageThreadView.swift` (mark messages as read, listen for updates)
+
+### Testing Standards
+
+**Manual Testing Required (No Unit Tests for MVP):**
+- Test long press own message → ReadReceiptsView appears
+- Test long press others' messages → no action
+- Test "Read" section shows participants who read
+- Test "Delivered" section shows participants who haven't read
+- Test read timestamps display correctly ("5 minutes ago", "now", etc.)
+- Test real-time updates as participants read
+- Test system messages don't show read receipts
+- Test sender excluded from delivered list
+- Test sorted by most recent read first
+- Test offline read tracking
+
+**CRITICAL Edge Cases:**
+1. All participants read → empty "Delivered" section
+2. No participants read → empty "Read" section
+3. Participant removed while sheet open → remove from list
+4. Message deleted → read receipts preserved
+5. Offline read → queue and sync when online
+6. User deletes account → show "Deleted User" in read receipts
+7. 1:1 chat → no read receipt sheet (use simple checkmark)
+8. System message → no long press action
+
+**Performance Considerations:**
+- Load participants asynchronously
+- Cache participant profiles with AsyncImage
+- Debounce read receipt updates (max 1 update per second)
+- Limit RTDB listener to current conversation only
+- Use LazyVStack for large participant lists
+
+---
+
 ## Metadata
 
 **Created by:** @sm (Scrum Master Bob)
@@ -428,6 +723,45 @@ extension MessageService {
 **Epic:** Epic 3: Group Chat
 **Story points:** 3
 **Priority:** P1
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-21 | 1.0 | Initial story creation | @sm (Scrum Master Bob) |
+| 2025-10-21 | 1.1 | Added Dev Notes section per template compliance | @po (Product Owner Sarah) |
+
+---
+
+## Dev Agent Record
+
+**This section is populated by the @dev agent during implementation.**
+
+### Agent Model Used
+
+*Agent model name and version will be recorded here by @dev*
+
+### Debug Log References
+
+*Links to debug logs or traces generated during development will be recorded here by @dev*
+
+### Completion Notes
+
+*Notes about task completion and any issues encountered will be recorded here by @dev*
+
+### File List
+
+*All files created, modified, or affected during story implementation will be listed here by @dev*
+
+---
+
+## QA Results
+
+**This section is populated by the @qa agent after reviewing the completed story implementation.**
+
+*QA validation results, test outcomes, and any issues found will be recorded here by @qa*
 
 ---
 

@@ -2,7 +2,7 @@
 /// Manages displayName uniqueness enforcement via Firestore `/displayNames` collection
 /// [Source: Epic 1, Story 1.1]
 
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import Foundation
 
 /// Handles displayName uniqueness checks and reservations in Firestore

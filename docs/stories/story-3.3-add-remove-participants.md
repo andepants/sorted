@@ -480,6 +480,298 @@ private func removeParticipant(_ participant: UserEntity) {
 
 ---
 
+## Dev Notes
+
+**CRITICAL: This section contains ALL implementation context needed. Developer should NOT need to read external docs.**
+
+### Participant Addition Flow with Filtering
+[Source: epic-3-group-chat.md lines 797-915]
+
+**Filter Out Already-in-Group Users:**
+```swift
+// In AddParticipantsView.loadAvailableUsers()
+let allUsers = try? modelContext.fetch(FetchDescriptor<UserEntity>())
+let currentParticipantIDs = Set(conversation.participantIDs)
+
+availableUsers = allUsers?.filter { user in
+    !currentParticipantIDs.contains(user.id)
+} ?? []
+```
+
+**Add Participants Pattern:**
+```swift
+func addParticipants(_ selectedUsers: [UserEntity]) async {
+    // Append to participantIDs
+    conversation.participantIDs.append(contentsOf: selectedUsers.map { $0.id })
+    conversation.updatedAt = Date()
+    conversation.syncStatus = .pending
+    try? modelContext.save()
+
+    // Sync to RTDB
+    try? await ConversationService.shared.syncConversationToRTDB(conversation)
+
+    // Send batched system message
+    let adminName = AuthService.shared.currentUser?.displayName ?? "Someone"
+    let messageText: String
+    if selectedUsers.count == 1 {
+        messageText = "\(adminName) added \(selectedUsers[0].displayName)"
+    } else {
+        messageText = "\(adminName) added \(selectedUsers.count) participants"
+    }
+
+    let systemMessage = MessageEntity(
+        id: UUID().uuidString,
+        conversationID: conversation.id,
+        senderID: "system",
+        text: messageText,
+        createdAt: Date(),
+        status: .sent,
+        syncStatus: .synced,
+        isSystemMessage: true
+    )
+    try? await MessageService.shared.sendMessageToRTDB(systemMessage)
+}
+```
+
+### Batched System Messages
+[Source: epic-3-group-chat.md lines 901-913]
+
+**CRITICAL: Batch multiple additions into single message**
+
+```swift
+// DON'T: Send N system messages for N users
+for user in selectedUsers {
+    sendSystemMessage("\(adminName) added \(user.displayName)")
+}
+
+// DO: Send 1 batched system message
+if selectedUsers.count == 1 {
+    sendSystemMessage("\(adminName) added \(selectedUsers[0].displayName)")
+} else {
+    sendSystemMessage("\(adminName) added \(selectedUsers.count) participants")
+}
+```
+
+**System Message Text Formats:**
+- Single add: "{AdminName} added {UserName}"
+- Bulk add: "{AdminName} added {N} participants"
+- Remove: "{AdminName} removed {UserName}"
+
+### Minimum Participant Count Enforcement
+[Source: epic-3-group-chat.md lines 855-868]
+
+**CRITICAL: Groups MUST have at least 2 participants**
+
+```swift
+func removeParticipant(_ participant: UserEntity) async {
+    // Check minimum count BEFORE removal
+    if conversation.participantIDs.count <= 2 {
+        showArchiveWarning = true  // "This will archive the group"
+        return
+    }
+
+    // Safe to remove
+    conversation.participantIDs.removeAll { $0 == participant.id }
+    conversation.adminUserIDs.removeAll { $0 == participant.id }
+    conversation.updatedAt = Date()
+    conversation.syncStatus = .pending
+    try? modelContext.save()
+
+    // Sync and send system message
+    try? await ConversationService.shared.syncConversationToRTDB(conversation)
+    // ... send system message
+}
+```
+
+**Auto-Archive Pattern:**
+```swift
+// If removal leaves only 1 participant
+if conversation.participantIDs.count == 1 {
+    conversation.isArchived = true  // Archive for remaining user
+    conversation.syncStatus = .pending
+    try? modelContext.save()
+}
+```
+
+### Historical Message Filtering for New Participants
+[Source: epic-3-group-chat.md lines 901, 915]
+
+**New participants ONLY see messages sent AFTER they joined**
+
+**MessageService Fetch Pattern:**
+```swift
+// In MessageService.fetchMessages(for conversationID:)
+func fetchMessages(for conversationID: String, userJoinedAt: Date?) async -> [MessageEntity] {
+    let messagesRef = Database.database().reference()
+        .child("messages")
+        .child(conversationID)
+
+    let snapshot = try? await messagesRef.getData()
+    var messages: [MessageEntity] = []
+
+    for child in snapshot?.children.allObjects as? [DataSnapshot] ?? [] {
+        guard let data = child.value as? [String: Any],
+              let timestamp = data["serverTimestamp"] as? Double else { continue }
+
+        let messageDate = Date(timeIntervalSince1970: timestamp / 1000)
+
+        // Filter: only show messages after user joined
+        if let joinDate = userJoinedAt, messageDate < joinDate {
+            continue  // Skip historical messages
+        }
+
+        // Parse message...
+        messages.append(message)
+    }
+
+    return messages
+}
+```
+
+**Join Timestamp Tracking:**
+```swift
+// Store in ConversationEntity (extend model if needed)
+var participantJoinTimestamps: [String: Date] = [:]  // userID -> joinDate
+
+// When adding participants
+for userID in newParticipantIDs {
+    conversation.participantJoinTimestamps[userID] = Date()
+}
+```
+
+### Typing Indicator Cleanup on Removal
+[Source: epic-3-group-chat.md lines 1113-1162]
+
+**CRITICAL: Remove typing indicator when participant removed**
+
+```swift
+// After removing participant from conversation
+func cleanupTypingIndicator(for userID: String, in conversationID: String) async {
+    let typingRef = Database.database().reference()
+        .child("typing")
+        .child(conversationID)
+        .child(userID)
+
+    try? await typingRef.removeValue()
+}
+
+// Call after participant removal
+try? await cleanupTypingIndicator(
+    for: removedParticipant.id,
+    in: conversation.id
+)
+```
+
+### Admin Auto-Promotion on Last Admin Removal
+[Source: epic-3-group-chat.md lines 455-456]
+
+**Server-Side RTDB Rule (Already Configured):**
+```
+// If admin removes themselves and they're the last admin
+// Server auto-promotes oldest participant to admin
+```
+
+**Client-Side Pattern (Story 3.2 Implementation):**
+```swift
+// When removing participant who is admin
+if conversation.adminUserIDs.contains(participant.id) {
+    conversation.adminUserIDs.removeAll { $0 == participant.id }
+
+    // If no admins remain, promote oldest participant
+    if conversation.adminUserIDs.isEmpty && !conversation.participantIDs.isEmpty {
+        let oldestParticipantID = conversation.participantIDs.sorted().first ?? ""
+        conversation.adminUserIDs.append(oldestParticipantID)
+    }
+}
+```
+
+### Offline Queue Handling
+[Source: epic-3-FIX-PATCHES.md]
+
+**Pattern: All participant changes queue when offline**
+
+```swift
+// In ConversationService.syncConversationToRTDB()
+func syncConversationToRTDB(_ conversation: ConversationEntity) async throws {
+    guard NetworkMonitor.shared.isConnected else {
+        // Offline: mark as pending, will sync when online
+        conversation.syncStatus = .pending
+        try? modelContext.save()
+        return
+    }
+
+    // Online: sync to RTDB
+    let conversationData = [
+        "participantIDs": conversation.participantIDs.reduce(into: [:]) { $0[$1] = true },
+        // ... other fields
+    ]
+
+    try await Database.database().reference()
+        .child("conversations")
+        .child(conversation.id)
+        .setValue(conversationData)
+
+    conversation.syncStatus = .synced
+    try? modelContext.save()
+}
+```
+
+### Duplicate Add Prevention
+[Source: epic-3-group-chat.md lines 797-915]
+
+**CRITICAL: Check before adding**
+
+```swift
+func addParticipants(_ selectedUsers: [UserEntity]) async {
+    // Filter out users already in group (double-check)
+    let currentParticipantIDs = Set(conversation.participantIDs)
+    let newUserIDs = selectedUsers.map { $0.id }.filter {
+        !currentParticipantIDs.contains($0)
+    }
+
+    guard !newUserIDs.isEmpty else {
+        print("All selected users already in group")
+        return
+    }
+
+    conversation.participantIDs.append(contentsOf: newUserIDs)
+    // ... rest of add logic
+}
+```
+
+### File Modification Order
+
+**CRITICAL: Follow this exact sequence:**
+
+1. ✅ Update `ConversationEntity.swift` - **Already done in Story 3.1**
+2. ✅ Update `MessageEntity.swift` - **Already done in Story 3.1**
+3. Create `AddParticipantsView.swift` (participant picker)
+4. Update `GroupInfoView.swift` (add "Add Participants" button, remove buttons)
+5. Update `ConversationService.swift` (sync participant changes)
+6. Update `MessageService.swift` (historical message filtering)
+7. Update `TypingIndicatorService.swift` (cleanup on removal)
+
+### Testing Standards
+
+**Manual Testing Required (No Unit Tests for MVP):**
+- Test add participants (single, multiple, bulk)
+- Test remove participants (admin, non-admin, concurrent)
+- Test minimum participant enforcement (2-person group)
+- Test historical message filtering (new participants don't see old messages)
+- Test offline add/remove (queue for sync)
+- Test typing indicator cleanup (removed users)
+- Test batched system messages (multiple additions)
+
+**CRITICAL Edge Cases:**
+1. Add user already in group → prevented by filter
+2. Remove participant with participant count = 2 → show archive warning
+3. Remove last admin → oldest participant auto-promoted
+4. Removed user typing → typing indicator cleaned up
+5. Offline add → queued, synced when online
+6. New participant sees only new messages → historical filtering works
+
+---
+
 ## Metadata
 
 **Created by:** @sm (Scrum Master Bob)
@@ -489,6 +781,45 @@ private func removeParticipant(_ participant: UserEntity) {
 **Epic:** Epic 3: Group Chat
 **Story points:** 3
 **Priority:** P1
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-21 | 1.0 | Initial story creation | @sm (Scrum Master Bob) |
+| 2025-10-21 | 1.1 | Added Dev Notes section per template compliance | @po (Product Owner Sarah) |
+
+---
+
+## Dev Agent Record
+
+**This section is populated by the @dev agent during implementation.**
+
+### Agent Model Used
+
+*Agent model name and version will be recorded here by @dev*
+
+### Debug Log References
+
+*Links to debug logs or traces generated during development will be recorded here by @dev*
+
+### Completion Notes
+
+*Notes about task completion and any issues encountered will be recorded here by @dev*
+
+### File List
+
+*All files created, modified, or affected during story implementation will be listed here by @dev*
+
+---
+
+## QA Results
+
+**This section is populated by the @qa agent after reviewing the completed story implementation.**
+
+*QA validation results, test outcomes, and any issues found will be recorded here by @qa*
 
 ---
 

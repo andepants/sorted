@@ -4,7 +4,7 @@
 
 @preconcurrency import FirebaseAuth
 @preconcurrency import FirebaseDatabase
-import FirebaseFirestore
+@preconcurrency import FirebaseFirestore
 import Foundation
 import Kingfisher
 
