@@ -25,6 +25,21 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
 
 ---
 
+### iOS-Specific Mobile Setup Notes
+
+**This is a native iOS mobile app** - ensure all scaffolding follows iOS best practices:
+
+- ✅ **Info.plist Permissions:** Camera, Photo Library, Notifications (NSCameraUsageDescription, NSPhotoLibraryUsageDescription, etc.)
+- ✅ **Build Configurations:** Development (emulators), Staging, Production with proper bundle IDs
+- ✅ **Swift 6 Strict Concurrency:** Enable `SWIFT_STRICT_CONCURRENCY = complete` for compile-time safety
+- ✅ **iOS Deployment Target:** Set to iOS 17.0 minimum (SwiftData requirement)
+- ✅ **Simulator Testing:** Test on iPhone SE (small screen), iPhone 14 Pro (Dynamic Island), iPad
+- ✅ **Keychain Entitlements:** Configure for secure token storage
+- ✅ **Background Modes:** Enable if needed for notifications, background fetch
+- ✅ **App Icons & Launch Screen:** Set up iOS-specific assets
+
+---
+
 ## User Stories
 
 ### Story 0.1: Initialize Xcode Project
@@ -53,6 +68,21 @@ Set up the complete iOS development environment, Xcode project structure, Fireba
    - Camera usage description (for profile pictures)
    - Photo library usage description
    - Notifications usage description
+
+**iOS Mobile Considerations:**
+- **Info.plist Required Keys** (add these NOW to avoid permission crashes later):
+  ```xml
+  <key>NSCameraUsageDescription</key>
+  <string>We need camera access to take profile pictures and share photos in messages.</string>
+
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>We need access to your photos to set profile pictures and share images.</string>
+
+  <key>NSUserNotificationsUsageDescription</key>
+  <string>We'll send you notifications for new messages so you never miss a conversation.</string>
+  ```
+- **Simulator vs Device Testing:** Simulator can't test camera, push notifications, or some Keychain features - plan for device testing
+- **Bundle ID Convention:** Use reverse domain notation (com.sorted.app.dev for development)
 
 ---
 

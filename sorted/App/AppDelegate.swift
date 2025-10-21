@@ -18,7 +18,6 @@ import UserNotifications
 
 /// Application delegate for handling app lifecycle and push notifications
 class AppDelegate: NSObject, UIApplicationDelegate {
-
     // MARK: - Lifecycle Methods
 
     /// Called when the application finishes launching
@@ -28,7 +27,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     /// - Returns: True if launch was successful
     func application(
         _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         // TODO: Register for push notifications
         // TODO: Configure Firebase Cloud Messaging

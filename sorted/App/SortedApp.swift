@@ -4,14 +4,14 @@
 /// Main entry point for the Sorted iOS application.
 /// Configured for Swift 6, iOS 17+, and SwiftUI with SwiftData persistence.
 
-import SwiftUI
-import SwiftData
 import Firebase
 import FirebaseAuth
 import FirebaseFirestore
 import FirebaseMessaging
 import FirebaseStorage
 import Kingfisher
+import SwiftData
+import SwiftUI
 
 @main
 struct SortedApp: App {
@@ -58,7 +58,6 @@ struct SortedApp: App {
 
             print("✅ SwiftData ModelContainer initialized successfully")
             print("   Entities: MessageEntity, ConversationEntity, UserEntity, AttachmentEntity, FAQEntity")
-
         } catch {
             fatalError("❌ Failed to initialize ModelContainer: \(error)")
         }

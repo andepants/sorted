@@ -4,8 +4,8 @@
 /// Placeholder view for initial project setup.
 /// Will be replaced with actual messaging UI in later stories.
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ContentView: View {
     var body: some View {

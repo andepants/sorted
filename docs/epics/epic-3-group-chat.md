@@ -28,6 +28,21 @@ Extend the one-on-one messaging infrastructure to support group conversations wi
 
 ---
 
+### iOS-Specific Group Messaging Patterns
+
+**Group chat extends Epic 2 with iOS mobile-first enhancements:**
+
+- ✅ **Multi-Select UI:** Native iOS participant selection with checkmarks
+- ✅ **Group Photo Picker:** Same permissions as profile photos (NSPhotoLibraryUsageDescription)
+- ✅ **Confirmation Dialogs:** Use `.confirmationDialog()` for destructive actions (leave group, remove participant)
+- ✅ **Sheet Presentations:** Use `.sheet()` for group creation, editing, participant management
+- ✅ **List Performance:** Efficient rendering of large participant lists with LazyVStack
+- ✅ **Haptic Feedback:** Haptics for participant add/remove, group name changes
+- ✅ **Accessibility:** VoiceOver announces participant count changes, admin badges
+- ✅ **Safe Areas:** All modals respect safe areas (especially on iPad)
+
+---
+
 ## User Stories
 
 ### Story 3.1: Create Group Conversation
