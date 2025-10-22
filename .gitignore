@@ -97,10 +97,9 @@ iOSInjectionProject/
 
 # Firebase
 #
-# Uncomment the next line if you want to ignore GoogleService-Info.plist
-# For open source projects, it's generally safe to commit this file
-# For private projects with multiple environments, you may want to ignore it
-# GoogleService-Info.plist
+# Ignore GoogleService-Info.plist anywhere in the project
+# For private projects with multiple environments, you should ignore this file
+**/GoogleService-Info.plist
 .firebase/
 firebase-debug.log
 firestore-debug.log
