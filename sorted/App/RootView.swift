@@ -20,6 +20,7 @@ struct RootView: View {
             } else if authViewModel.isAuthenticated {
                 // Authenticated: Show conversation list (main app)
                 ConversationListView()
+                    .environmentObject(authViewModel)
                     .environmentObject(NetworkMonitor.shared)
             } else {
                 // Not authenticated: Show login screen

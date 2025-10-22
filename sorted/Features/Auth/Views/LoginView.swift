@@ -235,6 +235,82 @@ struct LoginView: View {
                             )
                             .disabled(viewModel.isLoading)
                         }
+
+                        // Account 4: Dave
+                        HStack(spacing: 8) {
+                            Button(
+                                action: {
+                                    viewModel.email = "dave@test.com"
+                                    viewModel.password = "testpass123"
+                                },
+                                label: {
+                                    Label("Fill Dave", systemImage: "person.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.orange.opacity(0.2))
+                                        .foregroundColor(.orange)
+                                        .cornerRadius(6)
+                                }
+                            )
+
+                            Button(
+                                action: {
+                                    viewModel.email = "dave@test.com"
+                                    viewModel.password = "testpass123"
+                                    focusedField = nil
+                                    Task { await viewModel.login() }
+                                },
+                                label: {
+                                    Label("Login Dave", systemImage: "bolt.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.green.opacity(0.2))
+                                        .foregroundColor(.green)
+                                        .cornerRadius(6)
+                                }
+                            )
+                            .disabled(viewModel.isLoading)
+                        }
+
+                        // Account 5: Eve
+                        HStack(spacing: 8) {
+                            Button(
+                                action: {
+                                    viewModel.email = "eve@test.com"
+                                    viewModel.password = "testpass123"
+                                },
+                                label: {
+                                    Label("Fill Eve", systemImage: "person.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.teal.opacity(0.2))
+                                        .foregroundColor(.teal)
+                                        .cornerRadius(6)
+                                }
+                            )
+
+                            Button(
+                                action: {
+                                    viewModel.email = "eve@test.com"
+                                    viewModel.password = "testpass123"
+                                    focusedField = nil
+                                    Task { await viewModel.login() }
+                                },
+                                label: {
+                                    Label("Login Eve", systemImage: "bolt.fill")
+                                        .font(.caption2)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 8)
+                                        .background(Color.green.opacity(0.2))
+                                        .foregroundColor(.green)
+                                        .cornerRadius(6)
+                                }
+                            )
+                            .disabled(viewModel.isLoading)
+                        }
                     }
                     .padding(.top, 20)
                     #endif

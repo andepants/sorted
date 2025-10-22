@@ -14,6 +14,7 @@ struct ConversationListView: View {
 
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var networkMonitor: NetworkMonitor
+    @EnvironmentObject var authViewModel: AuthViewModel
 
     // MARK: - Query
 
@@ -128,6 +129,21 @@ struct ConversationListView: View {
             }
             .navigationTitle("Messages")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(
+                        action: {
+                            Task {
+                                await authViewModel.logout()
+                            }
+                        },
+                        label: {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                        }
+                    )
+                    .accessibilityLabel("Logout")
+                    .accessibilityHint("Sign out of your account")
+                }
+
                 ToolbarItem(placement: .primaryAction) {
                     Button(
                         action: { showRecipientPicker = true },
